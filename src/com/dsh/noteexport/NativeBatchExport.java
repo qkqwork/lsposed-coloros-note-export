@@ -65,7 +65,7 @@ final class NativeBatchExport {
 
     private static final long LIST_WAIT_SECONDS = 20;
     private static final long EDITOR_WAIT_SECONDS = 20;
-    private static final long CAPTURE_WAIT_SECONDS = 40;
+    private static final long CAPTURE_WAIT_SECONDS = 90;
     private static final long SETTLE_MILLIS = 700;
 
     /**
@@ -426,7 +426,24 @@ final class NativeBatchExport {
         for (int i = 0; i < limit; i++) {
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
+            if (topActivity() == null || !topActivity().getClass().getName().equals(LIST_ACTIVITY)) {
+                list = openNoteList(context);
+                if (list == null) {
+                    Log.w(TAG, "native batch: the note list is gone");
+                    break;
+                }
+            }
             Bitmap picture = captureOne(context, list, note);
+            if (picture == null) {
+                // A capture that timed out once usually works when it is asked
+                // again from a clean editor, so a note is retried before it is
+                // written off.
+                Log.i(TAG, "native batch: trying " + note.id + " once more");
+                list = openNoteList(context);
+                if (list != null) {
+                    picture = captureOne(context, list, note);
+                }
+            }
             if (picture == null) {
                 stats.failed++;
                 failuresInARow++;
@@ -593,15 +610,24 @@ final class NativeBatchExport {
         // bitmap would save one page of many, and tearing the editor down before
         // the merge cancels the capture coroutine half way through, so the wait
         // is for the preview screen and the settle after it lets the merge land.
+        // A note with a lot of content can take a while, hence the long cap and
+        // the progress line that says it is still working.
         long deadline = System.currentTimeMillis() + CAPTURE_WAIT_SECONDS * 1000;
+        long lastReport = System.currentTimeMillis();
         while (System.currentTimeMillis() < deadline && !shareScreenShown()) {
+            if (System.currentTimeMillis() - lastReport >= 15000) {
+                lastReport = System.currentTimeMillis();
+                Log.i(TAG, "native batch: still waiting for the picture ("
+                        + pageCount() + " page(s) so far)");
+            }
             sleep(200);
         }
         if (shareScreenShown()) {
             Log.i(TAG, "native batch: the app finished the picture");
             sleep(SETTLE_MILLIS * 2);
         } else {
-            Log.w(TAG, "native batch: the app never showed its preview screen");
+            Log.w(TAG, "native batch: the app never showed its preview screen after "
+                    + CAPTURE_WAIT_SECONDS + "s (" + pageCount() + " page(s) arrived)");
         }
 
         // The colour the pages have to be stacked on is the opposite of the ink
@@ -616,33 +642,53 @@ final class NativeBatchExport {
         synchronized (pages) {
             pages.clear();
         }
-        dismissShareScreen();
-        closeEditor();
-        sleep(SETTLE_MILLIS);
+        leaveCaptureScreens();
         return result;
+    }
+
+    /** How many pages the app has handed over for the note being captured. */
+    private static int pageCount() {
+        synchronized (pages) {
+            return pages.size();
+        }
+    }
+
+    /**
+     * Closes whatever the capture left on screen and waits for the list.
+     *
+     * <p>A capture that worked ends on the app's own preview screen, and one
+     * that failed can leave the editor open; either way the list has to be back
+     * in front before the next note can be opened, and it is waited for rather
+     * than assumed.
+     */
+    private static void leaveCaptureScreens() {
+        for (int attempt = 0; attempt < 8; attempt++) {
+            Activity top = topActivity();
+            if (top == null || top.getClass().getName().equals(LIST_ACTIVITY)) {
+                if (attempt > 0) {
+                    Log.i(TAG, "native batch: the list is back");
+                }
+                return;
+            }
+            String name = top.getClass().getName();
+            if (name.equals(SHARE_SCREEN) || name.equals(EDITOR_ACTIVITY)) {
+                Log.i(TAG, "native batch: closing " + name);
+                final Activity activity = top;
+                new Handler(Looper.getMainLooper()).post(activity::finish);
+            } else {
+                Log.w(TAG, "native batch: " + name + " is in front; waiting for the list");
+            }
+            sleep(SETTLE_MILLIS);
+        }
+        Activity top = topActivity();
+        Log.w(TAG, "native batch: the list did not come back; top is "
+                + (top == null ? "unknown" : top.getClass().getName()));
     }
 
     /** Whether the app's own preview of the finished picture is in front. */
     private static boolean shareScreenShown() {
         Activity top = topActivity();
         return top != null && top.getClass().getName().equals(SHARE_SCREEN);
-    }
-
-    /**
-     * Closes the screen the app opens to show the finished picture.
-     *
-     * <p>Capturing a picture ends with the app pushing its own preview on top of
-     * the editor, and that preview has to go before the next note can be opened
-     * from the list.
-     */
-    private static void dismissShareScreen() {
-        Activity top = topActivity();
-        if (top == null || !top.getClass().getName().equals(SHARE_SCREEN)) {
-            return;
-        }
-        Log.i(TAG, "native batch: closing the share screen");
-        new Handler(Looper.getMainLooper()).post(top::finish);
-        sleep(SETTLE_MILLIS * 2);
     }
 
     /**
