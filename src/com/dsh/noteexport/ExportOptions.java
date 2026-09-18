@@ -35,8 +35,14 @@ public final class ExportOptions {
     public Format format = Format.WORD;
     public WordLayout wordLayout = WordLayout.SINGLE;
 
-    /** The backing of a long picture, {@code auto} unless it is set. */
-    public Background background = Background.AUTO;
+    /**
+     * The backing of a long picture.
+     *
+     * <p>Dark by default: the app draws these notes in its dark theme, so their
+     * text is white and a dark backing is what the app itself puts behind it.
+     * The settings screen offers the other two.
+     */
+    public Background background = Background.DARK;
 
     /** Include notes sitting in the recycle bin. */
     public boolean includeRecycled = true;

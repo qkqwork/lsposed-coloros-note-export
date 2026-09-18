@@ -103,16 +103,17 @@ public class ConfigActivity extends Activity {
 
         root.addView(section("长图底色"));
         root.addView(hint("便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。"
-                + "「自动」按字色选相反的底色（大多是黑底白字，与应用自己的成品一致）；"
-                + "固定成白底或黑底时，字会自动改成相反颜色，照片和表情不受影响。"));
+                + "「黑底白字」是应用自己导出时的样子（默认）；「白底」会把白字重画成黑字；"
+                + "「自动」按便签的字色选，若你把系统切成浅色主题、字变黑了，自动就会给白底。"
+                + "注意：白底或黑底与照片里的大片同色区域无法区分，那一块会融进底色。"));
         backgroundGroup = new RadioGroup(this);
-        RadioButton autoBackground = radio("自动（跟着便签自己的配色，推荐）", 1);
-        RadioButton whiteBackground = radio("一律白底黑字", 2);
-        RadioButton darkBackground = radio("一律黑底白字", 3);
-        backgroundGroup.addView(autoBackground);
-        backgroundGroup.addView(whiteBackground);
+        RadioButton darkBackground = radio("一律黑底白字（默认）", 3);
+        RadioButton whiteBackground = radio("一律白底（白字自动转黑）", 2);
+        RadioButton autoBackground = radio("自动（跟着便签的字色，浅色主题下自动白底）", 1);
         backgroundGroup.addView(darkBackground);
-        autoBackground.setChecked(true);
+        backgroundGroup.addView(whiteBackground);
+        backgroundGroup.addView(autoBackground);
+        darkBackground.setChecked(true);
         root.addView(backgroundGroup);
 
         // ------------------------------------------------------- the watermark
@@ -428,12 +429,12 @@ public class ConfigActivity extends Activity {
         layoutGroup.check(ConfigContract.LAYOUT_PER_NOTE.equals(layout) ? 2 : 1);
         recycledBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, true));
         String background = prefs.getString(ConfigContract.COLUMN_BACKGROUND,
-                ConfigContract.BACKGROUND_AUTO);
-        int backgroundId = 1;
+                ConfigContract.BACKGROUND_DARK);
+        int backgroundId = 3;
         if (ConfigContract.BACKGROUND_WHITE.equals(background)) {
             backgroundId = 2;
-        } else if (ConfigContract.BACKGROUND_DARK.equals(background)) {
-            backgroundId = 3;
+        } else if (ConfigContract.BACKGROUND_AUTO.equals(background)) {
+            backgroundId = 1;
         }
         backgroundGroup.check(backgroundId);
 

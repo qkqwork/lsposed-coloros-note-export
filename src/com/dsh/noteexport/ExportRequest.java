@@ -116,11 +116,10 @@ public final class ExportRequest {
         if (options.limit > 0) {
             sb.append(';').append(KEY_LIMIT).append('=').append(options.limit);
         }
-        if (options.background != ExportOptions.Background.AUTO) {
-            sb.append(';').append(KEY_BACKGROUND).append('=')
-                    .append(options.background == ExportOptions.Background.DARK
-                            ? "dark" : "white");
-        }
+        sb.append(';').append(KEY_BACKGROUND).append('=')
+                .append(options.background == ExportOptions.Background.WHITE
+                        ? "white"
+                        : options.background == ExportOptions.Background.AUTO ? "auto" : "dark");
         return sb.toString();
     }
 
