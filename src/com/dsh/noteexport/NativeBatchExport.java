@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -18,8 +20,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import de.robv.android.xposed.XC_MethodHook;
 
@@ -61,6 +61,7 @@ final class NativeBatchExport {
     private static final String CAPTURE_HELPER =
             "com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper";
     private static final String SHARE_SCREEN = "com.nearme.note.activity.edit.SaveImageAndShare";
+    private static final String CAPTURE_UTILS = "com.nearme.note.util.CaptureScreenUtils";
 
     private static final long LIST_WAIT_SECONDS = 20;
     private static final long EDITOR_WAIT_SECONDS = 20;
@@ -69,10 +70,10 @@ final class NativeBatchExport {
 
     /** The note being captured, or null when no batch is running. */
     private static volatile Note pending;
-    /** Set while waiting for the app to save the picture of {@link #pending}. */
-    private static volatile CountDownLatch saved;
-    /** What the app saved for that note. */
-    private static volatile Bitmap savedBitmap;
+    /** The pages the app rendered for that note, in the order they arrived. */
+    private static final List<Bitmap> pages = new ArrayList<>();
+    /** The picture the app merged its pages into, when it merges them at all. */
+    private static volatile Bitmap merged;
     /** The editor screen that opened, so it can be closed again. */
     private static volatile Activity editor;
     /** Bumped per note so a late save from the previous one is ignored. */
@@ -100,13 +101,20 @@ final class NativeBatchExport {
         int copied = Hooks.hookMethodsStartingWith(SCREEN_SHOT_UTILS, loader, "saveBitmap",
                 copier);
         copied += Hooks.hookMethodsStartingWith(CAPTURE_HELPER, loader, "saveBitmap", copier);
-        // The long picture is assembled here as well, so its result is taken too:
-        // that covers the versions where the bitmap never reaches a save method.
-        copied += Hooks.hookMethodsNamed(SCREEN_SHOT_UTILS, loader,
+        // When the app merges the pages itself, its picture is the finished long
+        // image and is used as it is. The merge lives in CaptureScreenUtils, not
+        // in ScreenShotUtils, which is where the name suggests it should be.
+        copied += Hooks.hookMethodsNamed(CAPTURE_UTILS, loader,
                 "mergeAndSaveImagesAsLongBitmap", new XC_MethodHook() {
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) {
-                        collect(param.getResult());
+                        Object result = param.getResult();
+                        if (pending != null && result instanceof Bitmap) {
+                            Bitmap picture = (Bitmap) result;
+                            Log.i(TAG, "native batch: the app merged a " + picture.getWidth()
+                                    + "x" + picture.getHeight() + " picture");
+                            merged = picture;
+                        }
                     }
                 });
 
@@ -142,28 +150,122 @@ final class NativeBatchExport {
     }
 
     /**
-     * Keeps the biggest picture the app produced for the note being captured.
+     * Keeps every page the app rendered for the note being captured.
      *
-     * <p>The capture is built up out of several bitmaps and every one of them
-     * passes through the hooked methods, so the largest is the finished long
-     * picture and the small ones are the pages it was assembled from.
+     * <p>The editor does not draw one tall bitmap: it captures the note in
+     * slices and hands them on one by one, and the slices tile the note exactly
+     * (their heights add up to the editor height the app measured). The same
+     * bitmap can be reported twice, once by the producer and once by whoever
+     * writes it out, so a page is kept only the first time it is seen.
      */
     private static void collect(Object candidate) {
         if (pending == null || !(candidate instanceof Bitmap)) {
             return;
         }
         Bitmap bitmap = (Bitmap) candidate;
-        Log.i(TAG, "native batch: the app produced a " + bitmap.getWidth() + "x"
-                + bitmap.getHeight() + " picture");
-        Bitmap best = savedBitmap;
-        if (best == null || (long) bitmap.getWidth() * bitmap.getHeight()
-                > (long) best.getWidth() * best.getHeight()) {
-            savedBitmap = bitmap;
+        synchronized (pages) {
+            for (Bitmap seen : pages) {
+                if (seen == bitmap) {
+                    return;
+                }
+            }
+            pages.add(bitmap);
         }
-        CountDownLatch latch = saved;
-        if (latch != null) {
-            latch.countDown();
+        Log.i(TAG, "native batch: the app rendered a " + bitmap.getWidth() + "x"
+                + bitmap.getHeight() + " page");
+    }
+
+    /**
+     * The note as one picture.
+     *
+     * <p>The editor hands out the note in slices that tile it exactly, and their
+     * heights add up to the editor height the app itself measured, so stacking
+     * them in the order they arrived reproduces the note. If the app ever merges
+     * the slices itself, that finished picture is used instead.
+     */
+    private static Bitmap combined() {
+        Bitmap appPicture = merged;
+        if (appPicture != null) {
+            Log.i(TAG, "native batch: the app merged its pages into one picture");
+            return trimmed(appPicture);
         }
+        List<Bitmap> captured;
+        synchronized (pages) {
+            captured = new ArrayList<>(pages);
+        }
+        if (captured.isEmpty()) {
+            return null;
+        }
+        if (captured.size() == 1) {
+            return trimmed(captured.get(0));
+        }
+        int width = 0;
+        int height = 0;
+        for (Bitmap page : captured) {
+            width = Math.max(width, page.getWidth());
+            height += page.getHeight();
+        }
+        // The pages themselves are still in memory while the note is stacked, so
+        // a very long note is stacked with half the bytes per pixel: a 12,000 px
+        // note already needs about 60 MB at full colour.
+        Bitmap.Config config = height > 12000 ? Bitmap.Config.RGB_565 : Bitmap.Config.ARGB_8888;
+        Bitmap stitched;
+        try {
+            stitched = Bitmap.createBitmap(width, height, config);
+        } catch (Throwable t) {
+            Log.w(TAG, "native batch: the note could not be stacked: " + t);
+            Bitmap tallest = captured.get(0);
+            for (Bitmap page : captured) {
+                if (page.getHeight() > tallest.getHeight()) {
+                    tallest = page;
+                }
+            }
+            return trimmed(tallest);
+        }
+        Canvas canvas = new Canvas(stitched);
+        canvas.drawColor(Color.WHITE);
+        int top = 0;
+        for (Bitmap page : captured) {
+            canvas.drawBitmap(page, 0, top, null);
+            top += page.getHeight();
+        }
+        Log.i(TAG, "native batch: stacked " + captured.size() + " pages into " + width + "x"
+                + height);
+        return trimmed(stitched);
+    }
+
+    /**
+     * Drops the empty rows the app leaves under a short note.
+     *
+     * <p>The editor measures its own height, which is the whole screen, so a
+     * note that ends half way down comes back with thousands of blank rows under
+     * it. Only rows that are white all the way across are dropped, and only from
+     * the bottom, so nothing that was drawn is lost.
+     */
+    private static Bitmap trimmed(Bitmap picture) {
+        int width = picture.getWidth();
+        int height = picture.getHeight();
+        int[] row = new int[width];
+        int bottom = height;
+        while (bottom > 1) {
+            picture.getPixels(row, 0, width, 0, bottom - 1, width, 1);
+            boolean empty = true;
+            for (int pixel : row) {
+                if ((pixel & 0x00F0F0F0) != 0x00F0F0F0) {
+                    empty = false;
+                    break;
+                }
+            }
+            if (!empty) {
+                break;
+            }
+            bottom--;
+        }
+        if (bottom == height) {
+            return picture;
+        }
+        Log.i(TAG, "native batch: trimmed " + (height - bottom) + " empty rows at the bottom");
+        return Bitmap.createBitmap(picture, 0, 0, width, bottom);
     }
 
     /** The app's own picture of every note, one note at a time. */
@@ -181,15 +283,31 @@ final class NativeBatchExport {
                     "打不开便签列表界面：请先把便签应用切到前台再导出", root);
         }
 
+        int failuresInARow = 0;
         for (int i = 0; i < limit; i++) {
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
             Bitmap picture = captureOne(context, list, note);
             if (picture == null) {
                 stats.failed++;
-                Log.w(TAG, "native batch: stopping — " + note.id + " produced no picture");
-                break;
+                failuresInARow++;
+                Log.w(TAG, "native batch: " + note.id + " produced no picture");
+                // One note the app will not open, for instance a locked one, is
+                // no reason to give up on the rest; three in a row means the
+                // screen is no longer where this expects it to be.
+                if (failuresInARow >= 3) {
+                    Log.w(TAG, "native batch: stopping after " + failuresInARow
+                            + " notes in a row produced nothing");
+                    break;
+                }
+                list = openNoteList(context);
+                if (list == null) {
+                    Log.w(TAG, "native batch: the note list is gone");
+                    break;
+                }
+                continue;
             }
+            failuresInARow = 0;
             if (save(context, note, i + 1, root, picture, stats)) {
                 stats.notes++;
             } else {
@@ -271,8 +389,10 @@ final class NativeBatchExport {
             return null;
         }
         pending = note;
-        savedBitmap = null;
-        saved = new CountDownLatch(1);
+        synchronized (pages) {
+            pages.clear();
+        }
+        merged = null;
         final int thisRound = ++round;
 
         if (!clickItem(list, item)) {
@@ -294,21 +414,38 @@ final class NativeBatchExport {
             return null;
         }
 
-        boolean got;
-        try {
-            got = saved.await(CAPTURE_WAIT_SECONDS, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            got = false;
+        // The app renders the note page by page and merges the pages into the
+        // long picture, then opens its own preview screen. Waiting for the first
+        // bitmap would save one page of many, and tearing the editor down before
+        // the merge cancels the capture coroutine half way through, so the wait
+        // is for the preview screen and the settle after it lets the merge land.
+        long deadline = System.currentTimeMillis() + CAPTURE_WAIT_SECONDS * 1000;
+        while (System.currentTimeMillis() < deadline && !shareScreenShown()) {
+            sleep(200);
         }
-        Bitmap result = got && round == thisRound ? savedBitmap : null;
+        if (shareScreenShown()) {
+            Log.i(TAG, "native batch: the app finished the picture");
+            sleep(SETTLE_MILLIS * 2);
+        } else {
+            Log.w(TAG, "native batch: the app never showed its preview screen");
+        }
+
+        Bitmap result = round == thisRound ? combined() : null;
         pending = null;
-        saved = null;
-        savedBitmap = null;
+        merged = null;
+        synchronized (pages) {
+            pages.clear();
+        }
         dismissShareScreen();
         closeEditor();
         sleep(SETTLE_MILLIS);
         return result;
+    }
+
+    /** Whether the app's own preview of the finished picture is in front. */
+    private static boolean shareScreenShown() {
+        Activity top = topActivity();
+        return top != null && top.getClass().getName().equals(SHARE_SCREEN);
     }
 
     /**
