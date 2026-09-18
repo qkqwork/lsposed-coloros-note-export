@@ -83,7 +83,7 @@ build.sh          # Windows: bash build.sh 或见 BUILD.md
 
 1. 安装 APK，在 LSPosed 中启用模块，**作用域勾选「便签」**。
 2. 冷启动一次便签（让模块注入）。
-3. 打开模块"便签批量导出"，选格式与组织方式，点"开始导出"。
+3. 打开模块"ColorOS Note Export"，选格式与组织方式，点"开始导出"。
 4. 结果在 `Download/便签导出/`。
 
 ## 已知限制
@@ -92,3 +92,16 @@ build.sh          # Windows: bash build.sh 或见 BUILD.md
 - `com.oneplus.provider.Note` 与 provider 类的对应关系需在真机核实；
   查不到时会自动回退到"待导出标记"链路。
 - 便签升级若改动表名/列名，模块会记录诊断日志并尽量退化查询，不会静默导出空内容。
+
+## 依赖与许可
+
+- **许可**：GPL-3.0（见 `LICENSE`）。分发本模块或其修改版时，需一并提供完整源码。
+- **第三方代码**：没有。全部源码只 import `android.*` / `java.*` / `javax.*` 与
+  Xposed API；Word（OOXML）与长图渲染都是本项目自己实现的，未使用任何第三方库。
+- **Xposed API**：`stubs/` 下的 `de.robv.android.xposed.*` 是**手写的编译期桩**
+  （真类由 LSPosed 在运行时提供，构建脚本会把该包从 dex 里剥离），不是把框架代码打包进来。
+- **不捆绑目标应用**：仓库里没有 `com.coloros.note` 的 APK、dex、资源或字体；
+  调查便签内部流程用的反汇编摘录（`build/*.txt`）也**不随仓库发布**，
+  旁边的脚本可在本地对你自己的应用副本重新生成。
+- **非官方**：与 OPPO / ColorOS 无任何关联；名称中的 ColorOS 仅用于说明适用对象，
+  本项目未使用其图标或其它品牌资源。

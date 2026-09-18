@@ -46,3 +46,17 @@ build/last-backup-dir.txt
 build/note-text*.txt
 # Scratch pointer to the last export, rewritten by every run.
 build/last-export-stamp.txt
+
+# 便签应用自身的反汇编摘录（方法名清单与指令级 dump）。
+# 它们是这次调查的依据，但属于别人应用的目标码，不进公开仓库；
+# 旁边的 *.py / *.sh 脚本可以用你自己的一份应用重新生成。
+build/capture-classes.txt
+build/capture-flow.txt
+build/capture-helper.txt
+build/capture-runnable.txt
+build/capture-sites.txt
+build/d1_capture_ctx.txt
+build/editor-activity.txt
+build/pipeline-classes.txt
+build/screen-shot-utils.txt
+build/watermark-targets.txt
