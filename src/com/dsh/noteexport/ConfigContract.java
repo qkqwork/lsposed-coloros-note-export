@@ -77,8 +77,23 @@ public final class ConfigContract {
     public static final String COLUMN_FORMAT = "format";
     public static final String COLUMN_WORD_LAYOUT = "word_layout";
     public static final String COLUMN_INCLUDE_RECYCLED = "include_recycled";
+    public static final String COLUMN_BACKGROUND = "image_background";
     public static final String COLUMN_WATERMARK_MODE = "watermark_mode";
     public static final String COLUMN_WATERMARK_TEXT = "watermark_text";
+
+    // --------------------------------------------------- the long picture's paper
+
+    /**
+     * What a long picture is drawn on.
+     *
+     * <p>The app hands its pages over with no background at all, so something has
+     * to go behind them. {@code auto} takes the colour from the text the pages
+     * carry; the other two are what the user picked instead, and then the text is
+     * repainted to stay readable.
+     */
+    public static final String BACKGROUND_AUTO = "auto";
+    public static final String BACKGROUND_WHITE = "white";
+    public static final String BACKGROUND_DARK = "dark";
 
     // ------------------------------------------------------- the watermark
 

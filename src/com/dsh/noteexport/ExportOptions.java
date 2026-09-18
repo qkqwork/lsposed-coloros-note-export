@@ -22,8 +22,21 @@ public final class ExportOptions {
         PER_NOTE
     }
 
+    /** What a long picture is drawn on. */
+    public enum Background {
+        /** Work it out per note from the colour its text is drawn in. */
+        AUTO,
+        /** Always white; text that was drawn white is repainted black. */
+        WHITE,
+        /** Always the near-black the app itself uses; dark text is repainted white. */
+        DARK
+    }
+
     public Format format = Format.WORD;
     public WordLayout wordLayout = WordLayout.SINGLE;
+
+    /** The backing of a long picture, {@code auto} unless it is set. */
+    public Background background = Background.AUTO;
 
     /** Include notes sitting in the recycle bin. */
     public boolean includeRecycled = true;

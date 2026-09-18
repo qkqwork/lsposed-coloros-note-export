@@ -80,6 +80,8 @@ final class NativeBatchExport {
     private static final List<Bitmap> pages = new ArrayList<>();
     /** The picture the app merged its pages into, when it merges them at all. */
     private static volatile Bitmap merged;
+    /** Height of the page that was stacked last, which bounds the tail trimming. */
+    private static volatile int lastPageHeight;
     /** The editor screen that opened, so it can be closed again. */
     private static volatile Activity editor;
     /** Bumped per note so a late save from the previous one is ignored. */
@@ -252,7 +254,7 @@ final class NativeBatchExport {
         if (captured.isEmpty()) {
             return null;
         }
-
+        lastPageHeight = captured.get(captured.size() - 1).getHeight();
         int width = 0;
         int height = 0;
         for (Bitmap page : captured) {
@@ -288,70 +290,96 @@ final class NativeBatchExport {
         }
         Log.i(TAG, "native batch: stacked " + captured.size() + " pages into " + width + "x"
                 + height + " on 0x" + Integer.toHexString(background));
-        return trimmed(stitched, background);
+        // Not trimmed here: text that is the same colour as the background is
+        // invisible until it has been repainted, and trimming first would cut it
+        // off as if the note ended there. The caller repaints, then trims.
+        return stitched;
     }
 
     /** Puts a single see-through page on the note's background. */
     private static Bitmap composited(Bitmap page, int background) {
         if (!page.hasAlpha()) {
-            return trimmed(page, background);
+            return page;
         }
         Bitmap flat = Bitmap.createBitmap(page.getWidth(), page.getHeight(),
                 Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(flat);
         canvas.drawColor(background);
         canvas.drawBitmap(page, 0, 0, null);
-        return trimmed(flat, background);
+        return flat;
     }
 
     /**
      * The colour a note's see-through pages have to be stacked on.
      *
      * <p>The editor hands its pages over with the text drawn and no background at
-     * all, and the app itself puts them on the colour of the note's skin. White
-     * text on a white backdrop is invisible, which is what an export that "has
-     * everything except the text" is: the ink says which way round the note is
-     * meant to be read, so the backdrop is chosen to be the opposite of it.
+     * all, so the pages themselves say which way round the note is meant to be
+     * read: the text is the short strokes, and its colour decides the backdrop.
+     * The caller can also insist on white or on the near-black, in which case the
+     * glyphs are repainted to suit - see {@link #contrastText}.
      *
-     * <p>{@code 0x0D0D0D} is the colour the app uses behind a dark note, measured
-     * from the picture the app itself drew for one.
+     * <p>{@code 0x0D0D0D} is the colour the app itself uses behind a dark note,
+     * measured from the picture the app drew for one.
      */
-    private static int backgroundFor(List<Bitmap> pages) {
-        long lightInk = 0;
-        long darkInk = 0;
+    private static int backgroundFor(List<Bitmap> pages, ExportOptions.Background preference,
+            boolean[] textIsLightOut) {
+        long lightRuns = 0;
+        long darkRuns = 0;
         for (Bitmap page : pages) {
-            long[] balance = inkBalance(page);
-            lightInk += balance[0];
-            darkInk += balance[1];
+            long[] runs = strokes(page);
+            lightRuns += runs[0];
+            darkRuns += runs[1];
         }
-        boolean lightOnDark = lightInk > darkInk;
-        Log.i(TAG, "native batch: ink is " + (lightOnDark ? "light" : "dark")
-                + " (" + lightInk + " light vs " + darkInk + " dark samples), so the pages go on "
-                + (lightOnDark ? "0xff0d0d0d" : "white"));
-        return lightOnDark ? DARK_NOTE_BACKGROUND : Color.WHITE;
+        boolean lightText = lightRuns >= darkRuns;
+        textIsLightOut[0] = lightText;
+        Log.i(TAG, "native batch: the text is " + (lightText ? "light" : "dark")
+                + " (" + lightRuns + " light strokes vs " + darkRuns + " dark ones)");
+        if (preference == ExportOptions.Background.WHITE) {
+            return Color.WHITE;
+        }
+        if (preference == ExportOptions.Background.DARK) {
+            return DARK_NOTE_BACKGROUND;
+        }
+        return lightText ? DARK_NOTE_BACKGROUND : Color.WHITE;
     }
 
-    /** Counts the opaque light and dark pixels of a page. */
-    private static long[] inkBalance(Bitmap page) {
+    /**
+     * Counts the glyph strokes of a page, by colour.
+     *
+     * <p>Text is short runs of one colour; a photograph is long runs of many, so
+     * counting short runs of a flat, unsaturated colour finds the text and
+     * ignores the pictures. It is what makes a note that is mostly a photo come
+     * out the right way round.
+     */
+    private static long[] strokes(Bitmap page) {
         long light = 0;
         long dark = 0;
         try {
             int width = page.getWidth();
             int height = page.getHeight();
             int[] row = new int[width];
-            for (int y = 0; y < height; y += Math.max(1, height / 90)) {
+            int step = Math.max(1, height / 60);
+            for (int y = 0; y < height; y += step) {
                 page.getPixels(row, 0, width, 0, y, width, 1);
-                for (int x = 0; x < width; x += Math.max(1, width / 90)) {
-                    int pixel = row[x];
-                    if (((pixel >>> 24) & 0xFF) < 16) {
-                        continue;
-                    }
-                    int luminance = ((pixel >> 16 & 0xFF) * 299 + (pixel >> 8 & 0xFF) * 587
-                            + (pixel & 0xFF) * 114) / 1000;
-                    if (luminance >= 200) {
-                        light++;
-                    } else if (luminance <= 90) {
-                        dark++;
+                int run = 0;
+                int polarity = 0;
+                for (int x = 0; x < width; x++) {
+                    int here = polarityOf(row[x]);
+                    if (here != polarity) {
+                        if (polarity > 0) {
+                            light++;
+                        } else if (polarity < 0) {
+                            dark++;
+                        }
+                        polarity = here;
+                        run = 1;
+                    } else {
+                        run++;
+                        if (run > 40) {
+                            // too long to be a glyph: stop calling it one
+                            polarity = 0;
+                            run = 0;
+                        }
                     }
                 }
             }
@@ -361,20 +389,116 @@ final class NativeBatchExport {
         return new long[] {light, dark};
     }
 
+    /** 1 for a light flat pixel, -1 for a dark one, 0 for everything else. */
+    private static int polarityOf(int pixel) {
+        int alpha = (pixel >>> 24) & 0xFF;
+        if (alpha < 200) {
+            return 0;
+        }
+        int red = (pixel >> 16) & 0xFF;
+        int green = (pixel >> 8) & 0xFF;
+        int blue = pixel & 0xFF;
+        int high = Math.max(red, Math.max(green, blue));
+        int low = Math.min(red, Math.min(green, blue));
+        if (high - low > 24) {
+            // a coloured pixel: a picture or an emoji, not text
+            return 0;
+        }
+        int luminance = (red * 299 + green * 587 + blue * 114) / 1000;
+        if (luminance >= 200) {
+            return 1;
+        }
+        if (luminance <= 60) {
+            return -1;
+        }
+        return 0;
+    }
+
+    /**
+     * Repaints the glyphs when the background was chosen to match them.
+     *
+     * <p>White text on a white picture is unreadable, so when the two agree the
+     * strokes are drawn in the opposite colour. Only short runs of one flat
+     * colour are touched, which is what keeps the pictures and the emoji as they
+     * were.
+     */
+    private static Bitmap contrastText(Bitmap picture, boolean lightText, int background) {
+        boolean backgroundIsLight = isLight(background);
+        if (backgroundIsLight != lightText) {
+            return picture;                       // already light-on-dark or dark-on-light
+        }
+        int glyph = lightText ? 0xFFFFFFFF : 0xFF000000;
+        int replacement = lightText ? 0xFF000000 : 0xFFFFFFFF;
+        int width = picture.getWidth();
+        int height = picture.getHeight();
+        int[] row = new int[width];
+        long changed = 0;
+        try {
+            for (int y = 0; y < height; y++) {
+                picture.getPixels(row, 0, width, 0, y, width, 1);
+                int start = -1;
+                for (int x = 0; x <= width; x++) {
+                    boolean glyphHere = x < width && near(row[x], glyph);
+                    if (glyphHere) {
+                        if (start < 0) {
+                            start = x;
+                        }
+                    } else if (start >= 0) {
+                        if (x - start <= 40) {
+                            for (int index = start; index < x; index++) {
+                                row[index] = replacement;
+                                changed++;
+                            }
+                        }
+                        start = -1;
+                    }
+                }
+                picture.setPixels(row, 0, width, 0, y, width, 1);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "native batch: the text could not be repainted: " + t);
+            return picture;
+        }
+        Log.i(TAG, "native batch: repainted " + changed + " pixel(s) of "
+                + (lightText ? "light" : "dark") + " text to suit the background");
+        return picture;
+    }
+
+    /** Whether a pixel is the given flat colour, allowing for antialiasing. */
+    private static boolean near(int pixel, int wanted) {
+        int alpha = (pixel >>> 24) & 0xFF;
+        if (alpha < 200) {
+            return false;
+        }
+        int red = Math.abs(((pixel >> 16) & 0xFF) - ((wanted >> 16) & 0xFF));
+        int green = Math.abs(((pixel >> 8) & 0xFF) - ((wanted >> 8) & 0xFF));
+        int blue = Math.abs((pixel & 0xFF) - (wanted & 0xFF));
+        return red <= 8 && green <= 8 && blue <= 8;
+    }
+
+    private static boolean isLight(int colour) {
+        int luminance = (((colour >> 16) & 0xFF) * 299 + ((colour >> 8) & 0xFF) * 587
+                + (colour & 0xFF) * 114) / 1000;
+        return luminance >= 128;
+    }
+
     /**
      * Drops the empty rows the app leaves under a short note.
      *
      * <p>The editor measures its own height, which is the whole screen, so a
-     * note that ends half way down comes back with thousands of blank rows under
-     * it. Only rows that are the background colour all the way across are
-     * dropped, and only from the bottom, so nothing that was drawn is lost.
+     * note that ends half way down comes back with blank rows under it. Only rows
+     * that are the background colour all the way across are dropped, only from
+     * the bottom, and never further up than the last page: a note whose content
+     * ends in something white on a white background would otherwise have real
+     * content cut away as if it were blank.
      */
-    private static Bitmap trimmed(Bitmap picture, int background) {
+    private static Bitmap trimmed(Bitmap picture, int background, int stopAbove) {
         int width = picture.getWidth();
         int height = picture.getHeight();
+        int floor = Math.max(1, stopAbove);
         int[] row = new int[width];
         int bottom = height;
-        while (bottom > 1) {
+        while (bottom > floor) {
             picture.getPixels(row, 0, width, 0, bottom - 1, width, 1);
             boolean empty = true;
             for (int pixel : row) {
@@ -433,7 +557,7 @@ final class NativeBatchExport {
                     break;
                 }
             }
-            Bitmap picture = captureOne(context, list, note);
+            Bitmap picture = captureOne(context, list, note, options.background);
             if (picture == null) {
                 // A capture that timed out once usually works when it is asked
                 // again from a clean editor, so a note is retried before it is
@@ -441,7 +565,7 @@ final class NativeBatchExport {
                 Log.i(TAG, "native batch: trying " + note.id + " once more");
                 list = openNoteList(context);
                 if (list != null) {
-                    picture = captureOne(context, list, note);
+                    picture = captureOne(context, list, note, options.background);
                 }
             }
             if (picture == null) {
@@ -567,7 +691,8 @@ final class NativeBatchExport {
     }
 
     /** Clicks the note in the list, waits for the editor, and asks it to capture. */
-    private static Bitmap captureOne(Context context, Activity list, Note note) {
+    private static Bitmap captureOne(Context context, Activity list, Note note,
+            ExportOptions.Background preference) {
         View item = findListItem(list, note);
         if (item == null) {
             // The list shows one folder at a time, so a note from another folder
@@ -630,20 +755,37 @@ final class NativeBatchExport {
                     + CAPTURE_WAIT_SECONDS + "s (" + pageCount() + " page(s) arrived)");
         }
 
-        // The colour the pages have to be stacked on is the opposite of the ink
-        // they carry, because the app hands them over with no background at all.
+        // The pages arrive with no background at all, so the text they carry
+        // decides what they are stacked on; a background the caller insisted on
+        // is used as it is, and the glyphs are repainted to suit it.
         List<Bitmap> captured;
         synchronized (pages) {
             captured = new ArrayList<>(pages);
         }
-        Bitmap result = round == thisRound ? combined(backgroundFor(captured)) : null;
+        if (round != thisRound) {
+            pending = null;
+            merged = null;
+            synchronized (pages) {
+                pages.clear();
+            }
+            leaveCaptureScreens();
+            return null;
+        }
+        boolean[] lightText = new boolean[1];
+        int background = backgroundFor(captured, preference, lightText);
+        Bitmap painted = combined(background);
+        if (painted != null) {
+            painted = contrastText(painted, lightText[0], background);
+            int stopAbove = painted.getHeight() - Math.max(0, lastPageHeight);
+            painted = trimmed(painted, background, stopAbove);
+        }
         pending = null;
         merged = null;
         synchronized (pages) {
             pages.clear();
         }
         leaveCaptureScreens();
-        return result;
+        return painted;
     }
 
     /** How many pages the app has handed over for the note being captured. */

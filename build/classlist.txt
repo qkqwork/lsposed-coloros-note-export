@@ -14,6 +14,7 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\Doc$Paragra
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\Doc$Run.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\Doc.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\DocxWriter.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ExportOptions$Background.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ExportOptions$Format.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ExportOptions$WordLayout.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ExportOptions.class

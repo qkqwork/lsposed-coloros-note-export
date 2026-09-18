@@ -46,6 +46,8 @@ public class ConfigActivity extends Activity {
     private LinearLayout layoutOptions;
     private RadioGroup watermarkGroup;
     private EditText watermarkText;
+    /** What a long picture is drawn on: automatic, always white or always dark. */
+    private RadioGroup backgroundGroup;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -76,8 +78,7 @@ public class ConfigActivity extends Activity {
         formatGroup = new RadioGroup(this);
         RadioButton word = radio("Word 文档（.docx）", 1);
         RadioButton nativeImage = radio("原版长图（便签应用自己渲染，推荐）", 2);
-        RadioButton drawnImage = radio("长图（模块绘制，版式与便签不同）", 3);
-        formatGroup.addView(word);
+        RadioButton drawnImage = radio("长图（模块绘制，版式与便签不同）", 3);        formatGroup.addView(word);
         formatGroup.addView(nativeImage);
         formatGroup.addView(drawnImage);
         root.addView(formatGroup);
@@ -99,6 +100,20 @@ public class ConfigActivity extends Activity {
         recycledBox.setText("包含回收站中的便签");
         recycledBox.setChecked(true);
         root.addView(recycledBox);
+
+        root.addView(section("长图底色"));
+        root.addView(hint("便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。"
+                + "「自动」按字色选相反的底色（大多是黑底白字，与应用自己的成品一致）；"
+                + "固定成白底或黑底时，字会自动改成相反颜色，照片和表情不受影响。"));
+        backgroundGroup = new RadioGroup(this);
+        RadioButton autoBackground = radio("自动（跟着便签自己的配色，推荐）", 1);
+        RadioButton whiteBackground = radio("一律白底黑字", 2);
+        RadioButton darkBackground = radio("一律黑底白字", 3);
+        backgroundGroup.addView(autoBackground);
+        backgroundGroup.addView(whiteBackground);
+        backgroundGroup.addView(darkBackground);
+        autoBackground.setChecked(true);
+        root.addView(backgroundGroup);
 
         // ------------------------------------------------------- the watermark
 
@@ -239,7 +254,10 @@ public class ConfigActivity extends Activity {
         ExportOptions options = new ExportOptions();
         switch (formatGroup.getCheckedRadioButtonId()) {
             case 2:
-                options.format = ExportOptions.Format.NATIVE;
+                // The app draws these itself, one note at a time, driven from
+                // inside its own process; the older share-screen route is kept
+                // for reference only and is not offered here any more.
+                options.format = ExportOptions.Format.NATIVE_BATCH;
                 break;
             case 3:
                 options.format = ExportOptions.Format.IMAGE;
@@ -252,6 +270,17 @@ public class ConfigActivity extends Activity {
                 ? ExportOptions.WordLayout.PER_NOTE : ExportOptions.WordLayout.SINGLE;
         options.includeRecycled = recycledBox.isChecked();
         options.timestampedFolder = true;
+        switch (backgroundGroup.getCheckedRadioButtonId()) {
+            case 2:
+                options.background = ExportOptions.Background.WHITE;
+                break;
+            case 3:
+                options.background = ExportOptions.Background.DARK;
+                break;
+            default:
+                options.background = ExportOptions.Background.AUTO;
+                break;
+        }
         return options;
     }
 
@@ -270,7 +299,8 @@ public class ConfigActivity extends Activity {
         exportButton.setEnabled(false);
         attemptsLeft = 2;
 
-        if (options.format == ExportOptions.Format.NATIVE) {
+        if (options.format == ExportOptions.Format.NATIVE
+                || options.format == ExportOptions.Format.NATIVE_BATCH) {
             // The app draws these pictures itself, and Android only lets a
             // foreground app open its own screens — so the Notes app is brought
             // up first and asked a moment later.
@@ -388,7 +418,8 @@ public class ConfigActivity extends Activity {
         String layout = prefs.getString(ConfigContract.COLUMN_WORD_LAYOUT,
                 ConfigContract.LAYOUT_SINGLE);
         int formatId = 1;
-        if (ConfigContract.FORMAT_NATIVE.equals(format)) {
+        if (ConfigContract.FORMAT_NATIVE.equals(format)
+                || ConfigContract.FORMAT_NATIVE_BATCH.equals(format)) {
             formatId = 2;
         } else if (ConfigContract.FORMAT_IMAGE.equals(format)) {
             formatId = 3;
@@ -396,6 +427,15 @@ public class ConfigActivity extends Activity {
         formatGroup.check(formatId);
         layoutGroup.check(ConfigContract.LAYOUT_PER_NOTE.equals(layout) ? 2 : 1);
         recycledBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, true));
+        String background = prefs.getString(ConfigContract.COLUMN_BACKGROUND,
+                ConfigContract.BACKGROUND_AUTO);
+        int backgroundId = 1;
+        if (ConfigContract.BACKGROUND_WHITE.equals(background)) {
+            backgroundId = 2;
+        } else if (ConfigContract.BACKGROUND_DARK.equals(background)) {
+            backgroundId = 3;
+        }
+        backgroundGroup.check(backgroundId);
 
         WatermarkSettings watermark = WatermarkSettings.read(this);
         watermarkGroup.check(watermarkRadioId(watermark.mode));
@@ -413,11 +453,19 @@ public class ConfigActivity extends Activity {
                                 ? ConfigContract.FORMAT_IMAGE
                                 : readOptions().format == ExportOptions.Format.NATIVE
                                         ? ConfigContract.FORMAT_NATIVE
-                                        : ConfigContract.FORMAT_WORD)
+                                        : readOptions().format == ExportOptions.Format.NATIVE_BATCH
+                                                ? ConfigContract.FORMAT_NATIVE_BATCH
+                                                : ConfigContract.FORMAT_WORD)
                 .putString(ConfigContract.COLUMN_WORD_LAYOUT,
                         options.wordLayout == ExportOptions.WordLayout.PER_NOTE
                                 ? ConfigContract.LAYOUT_PER_NOTE : ConfigContract.LAYOUT_SINGLE)
                 .putBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, options.includeRecycled)
+                .putString(ConfigContract.COLUMN_BACKGROUND,
+                        options.background == ExportOptions.Background.WHITE
+                                ? ConfigContract.BACKGROUND_WHITE
+                                : options.background == ExportOptions.Background.DARK
+                                        ? ConfigContract.BACKGROUND_DARK
+                                        : ConfigContract.BACKGROUND_AUTO)
                 .apply();
         // The watermark travels to the Notes process through the provider and a
         // mirrored file, so both are written here, where the user just decided.

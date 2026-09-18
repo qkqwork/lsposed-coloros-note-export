@@ -37,6 +37,8 @@ public final class ExportRequest {
     public static final String KEY_STAMPED = "stamped";
     /** Optional cap on how many notes to export; used for trying a format out. */
     public static final String KEY_LIMIT = "limit";
+    /** What a long picture is drawn on: {@code auto}, {@code white} or {@code dark}. */
+    public static final String KEY_BACKGROUND = "bg";
 
     /** Result of reading the file: the options plus the request id. */
     public static final class Request {
@@ -114,6 +116,11 @@ public final class ExportRequest {
         if (options.limit > 0) {
             sb.append(';').append(KEY_LIMIT).append('=').append(options.limit);
         }
+        if (options.background != ExportOptions.Background.AUTO) {
+            sb.append(';').append(KEY_BACKGROUND).append('=')
+                    .append(options.background == ExportOptions.Background.DARK
+                            ? "dark" : "white");
+        }
         return sb.toString();
     }
 
@@ -169,6 +176,14 @@ public final class ExportRequest {
                     options.limit = Math.max(0, Integer.parseInt(value));
                 } catch (NumberFormatException ignored) {
                     // a malformed limit simply means "no limit"
+                }
+            } else if (KEY_BACKGROUND.equals(key)) {
+                if ("white".equalsIgnoreCase(value)) {
+                    options.background = ExportOptions.Background.WHITE;
+                } else if ("dark".equalsIgnoreCase(value) || "black".equalsIgnoreCase(value)) {
+                    options.background = ExportOptions.Background.DARK;
+                } else {
+                    options.background = ExportOptions.Background.AUTO;
                 }
             }
         }
