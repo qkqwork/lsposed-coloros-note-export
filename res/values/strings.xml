@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">便签批量导出</string>
+    <!-- Shown as the module's name in LSPosed and in the launcher. ConfigActivity
+         puts the same words in its own title, and says so there. -->
+    <string name="app_name">ColorOS Note Export</string>
 </resources>

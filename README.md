@@ -1,15 +1,22 @@
-# OPPO/ColorOS 便签批量导出 · Xposed 模块
+# lsposed-coloros-note-export
+
+**LSPosed 模块：批量导出 ColorOS / OPPO 便签为 Word 文档或原版长图**
+
+> 非官方项目，与 OPPO / ColorOS 无关。
+> 仅在 OnePlus PKR110 · ColorOS 16（Android 16 / API 36）· 便签 16.6.22 上验证过。
 
 Hook `com.coloros.note`，在**便签进程内部**批量导出全部便签：
 
-- **图片**：每条便签渲染成一张长图 PNG（按分类分文件夹）
+- **图片（原版长图）**：应用自己的编辑器渲染每条便签，模块把它画出的页面拼成一张长图 PNG
+- **图片（模块绘制）**：不依赖 WebView 的自绘版式
 - **Word**：两种组织方式，可在设置页自选
   - `单个 docx`：一个 .docx 内含全部分类，图片内嵌
   - `每条一个 docx`：按分类分文件夹，每条便签一个 .docx
 
 产物落在 `Download/便签导出/<时间戳>/` 下，**不需要任何存储权限**。
 
-针对 **ColorOS 16（Android 16 / API 36）· 便签 16.x**。
+已装模块在 LSPosed 列表里显示的名字是 **ColorOS Note Export**（`res/values/strings.xml` 的
+`app_name`），仓库名与模块名是两回事，改仓库名不影响已装机器的行为。
 
 ## 为什么这样实现
 

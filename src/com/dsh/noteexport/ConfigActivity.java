@@ -77,7 +77,10 @@ public class ConfigActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(pad, pad, pad, pad);
 
-        root.addView(title("便签批量导出"));
+        // Kept in step with app_name in res/values/strings.xml by hand: that is
+        // the name LSPosed and the launcher show, and this is the same words on
+        // the screen it opens.
+        root.addView(title("ColorOS Note Export"));
         root.addView(hint("在 LSPosed 中启用本模块，作用域勾选「便签」，"
                 + "然后冷启动一次便签应用。"));
 

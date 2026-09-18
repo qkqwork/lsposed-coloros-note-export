@@ -367,8 +367,8 @@ public final class DocxWriter {
                 + " xmlns:dcterms=\"http://purl.org/dc/terms/\""
                 + " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
                 + "<dc:title>ColorOS 便签导出</dc:title>"
-                + "<dc:creator>note-export</dc:creator>"
-                + "<cp:lastModifiedBy>note-export</cp:lastModifiedBy>"
+                + "<dc:creator>lsposed-coloros-note-export</dc:creator>"
+                + "<cp:lastModifiedBy>lsposed-coloros-note-export</cp:lastModifiedBy>"
                 + "<dcterms:created xsi:type=\"dcterms:W3CDTF\">" + stamp + "</dcterms:created>"
                 + "<dcterms:modified xsi:type=\"dcterms:W3CDTF\">" + stamp + "</dcterms:modified>"
                 + "</cp:coreProperties>";
@@ -378,7 +378,7 @@ public final class DocxWriter {
         return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
                 + "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\""
                 + " xmlns:vt=\"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes\">"
-                + "<Application>note-export</Application></Properties>";
+                + "<Application>lsposed-coloros-note-export</Application></Properties>";
     }
 
     // ------------------------------------------------------------- primitives
