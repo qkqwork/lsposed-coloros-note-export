@@ -520,12 +520,47 @@ final class NativeBatchExport {
         return null;
     }
 
+    /**
+     * Opens the editor straight at a note, for one the list is not showing.
+     *
+     * <p>The editor's own argument name is read from the app, because it is what
+     * the app itself puts in the intent when something outside it asks for a
+     * note to be opened; guessing it would be worse than asking.
+     */
+    private static boolean openEditorByGuid(Context context, Note note) {
+        try {
+            Class<?> fragment = Class.forName(EDITOR_FRAGMENT, false, appLoader);
+            Field argument = fragment.getField("ARGUMENTS_EXTRA_NOTE_GUID");
+            argument.setAccessible(true);
+            Object name = argument.get(null);
+            if (!(name instanceof String)) {
+                return false;
+            }
+            Intent intent = new Intent();
+            intent.setClassName(ConfigContract.NOTES_PKG, EDITOR_ACTIVITY);
+            intent.putExtra((String) name, note.id);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            Log.i(TAG, "native batch: opening " + note.id + " with " + name);
+            context.startActivity(intent);
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "native batch: the editor could not be opened by guid: " + t);
+            return false;
+        }
+    }
+
     /** Clicks the note in the list, waits for the editor, and asks it to capture. */
     private static Bitmap captureOne(Context context, Activity list, Note note) {
         View item = findListItem(list, note);
         if (item == null) {
-            Log.w(TAG, "native batch: " + note.id + " is not in the list right now");
-            return null;
+            // The list shows one folder at a time, so a note from another folder
+            // is simply not on screen. The editor can be opened at a note by its
+            // guid instead, which needs nothing from the list at all.
+            Log.i(TAG, "native batch: " + note.id + " is not in the folder on screen");
+            if (!openEditorByGuid(context, note)) {
+                Log.w(TAG, "native batch: " + note.id + " is not in the list right now");
+                return null;
+            }
         }
         pending = note;
         synchronized (pages) {
@@ -534,7 +569,7 @@ final class NativeBatchExport {
         merged = null;
         final int thisRound = ++round;
 
-        if (!clickItem(list, item)) {
+        if (item != null && !clickItem(list, item)) {
             Log.w(TAG, "native batch: the list item could not be clicked");
             pending = null;
             return null;
