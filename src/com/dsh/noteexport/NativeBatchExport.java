@@ -16,7 +16,6 @@ import android.widget.ListView;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -59,6 +58,9 @@ final class NativeBatchExport {
     private static final String EDITOR_FRAGMENT =
             "com.nearme.note.activity.richedit.webview.WVNoteViewEditFragment";
     private static final String SCREEN_SHOT_UTILS = "com.nearme.note.util.ScreenShotUtils";
+    private static final String CAPTURE_HELPER =
+            "com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper";
+    private static final String SHARE_SCREEN = "com.nearme.note.activity.edit.SaveImageAndShare";
 
     private static final long LIST_WAIT_SECONDS = 20;
     private static final long EDITOR_WAIT_SECONDS = 20;
@@ -77,6 +79,8 @@ final class NativeBatchExport {
     private static volatile int round;
     /** The hooked app's class loader, used to reach its Kotlin types. */
     private static volatile ClassLoader appLoader;
+    /** The screen the app resumed last, which is the one the batch works from. */
+    private static volatile Activity resumed;
 
     private NativeBatchExport() {
     }
@@ -88,26 +92,23 @@ final class NativeBatchExport {
         XC_MethodHook copier = new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
-                if (pending == null || param.args.length == 0) {
-                    return;
-                }
-                Object first = param.args[0];
-                if (first instanceof Bitmap) {
-                    Bitmap bitmap = (Bitmap) first;
-                    if (savedBitmap == null
-                            || (long) bitmap.getWidth() * bitmap.getHeight()
-                                    > (long) savedBitmap.getWidth() * savedBitmap.getHeight()) {
-                        savedBitmap = bitmap;
-                    }
-                    CountDownLatch latch = saved;
-                    if (latch != null) {
-                        latch.countDown();
-                    }
+                if (param.args.length > 0) {
+                    collect(param.args[0]);
                 }
             }
         };
-        int copied = Hooks.hookMethodsNamed(SCREEN_SHOT_UTILS, loader, "saveBitmap", copier);
-        copied += Hooks.hookMethodsNamed(SCREEN_SHOT_UTILS, loader, "saveBitmapAsync", copier);
+        int copied = Hooks.hookMethodsStartingWith(SCREEN_SHOT_UTILS, loader, "saveBitmap",
+                copier);
+        copied += Hooks.hookMethodsStartingWith(CAPTURE_HELPER, loader, "saveBitmap", copier);
+        // The long picture is assembled here as well, so its result is taken too:
+        // that covers the versions where the bitmap never reaches a save method.
+        copied += Hooks.hookMethodsNamed(SCREEN_SHOT_UTILS, loader,
+                "mergeAndSaveImagesAsLongBitmap", new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) {
+                        collect(param.getResult());
+                    }
+                });
 
         Hooks.hookMethodsNamed(EDITOR_ACTIVITY, loader, "onCreate", new XC_MethodHook() {
             @Override
@@ -118,6 +119,19 @@ final class NativeBatchExport {
                 }
             }
         }, true);
+        // The framework's own onResume, reached through the list activity's
+        // hierarchy, is the reliable way to know which screen is in front:
+        // reading ActivityThread's internal map sometimes comes back empty.
+        int resumers = Hooks.hookMethodsNamed(LIST_ACTIVITY, loader, "onResume",
+                new XC_MethodHook() {
+                    @Override
+                    protected void afterHookedMethod(MethodHookParam param) {
+                        if (param.thisObject instanceof Activity) {
+                            resumed = (Activity) param.thisObject;
+                        }
+                    }
+                });
+        Log.i(TAG, "native batch: tracking " + resumers + " onResume method(s)");
         Hooks.hookMethodsNamed(EDITOR_ACTIVITY, loader, "onDestroy", new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
@@ -125,6 +139,31 @@ final class NativeBatchExport {
             }
         }, true);
         Log.i(TAG, "native batch: hooked " + copied + " save method(s) and the editor");
+    }
+
+    /**
+     * Keeps the biggest picture the app produced for the note being captured.
+     *
+     * <p>The capture is built up out of several bitmaps and every one of them
+     * passes through the hooked methods, so the largest is the finished long
+     * picture and the small ones are the pages it was assembled from.
+     */
+    private static void collect(Object candidate) {
+        if (pending == null || !(candidate instanceof Bitmap)) {
+            return;
+        }
+        Bitmap bitmap = (Bitmap) candidate;
+        Log.i(TAG, "native batch: the app produced a " + bitmap.getWidth() + "x"
+                + bitmap.getHeight() + " picture");
+        Bitmap best = savedBitmap;
+        if (best == null || (long) bitmap.getWidth() * bitmap.getHeight()
+                > (long) best.getWidth() * best.getHeight()) {
+            savedBitmap = bitmap;
+        }
+        CountDownLatch latch = saved;
+        if (latch != null) {
+            latch.countDown();
+        }
     }
 
     /** The app's own picture of every note, one note at a time. */
@@ -242,7 +281,9 @@ final class NativeBatchExport {
             return null;
         }
         if (!waitForEditor()) {
-            Log.w(TAG, "native batch: the editor did not open");
+            Activity top = topActivity();
+            Log.w(TAG, "native batch: the editor did not open; the top screen is "
+                    + (top == null ? "unknown" : top.getClass().getName()));
             pending = null;
             return null;
         }
@@ -264,9 +305,27 @@ final class NativeBatchExport {
         pending = null;
         saved = null;
         savedBitmap = null;
+        dismissShareScreen();
         closeEditor();
         sleep(SETTLE_MILLIS);
         return result;
+    }
+
+    /**
+     * Closes the screen the app opens to show the finished picture.
+     *
+     * <p>Capturing a picture ends with the app pushing its own preview on top of
+     * the editor, and that preview has to go before the next note can be opened
+     * from the list.
+     */
+    private static void dismissShareScreen() {
+        Activity top = topActivity();
+        if (top == null || !top.getClass().getName().equals(SHARE_SCREEN)) {
+            return;
+        }
+        Log.i(TAG, "native batch: closing the share screen");
+        new Handler(Looper.getMainLooper()).post(top::finish);
+        sleep(SETTLE_MILLIS * 2);
     }
 
     /**
@@ -563,6 +622,21 @@ final class NativeBatchExport {
         return false;
     }
 
+    /** The first clickable view inside a row, or null when the row itself is it. */
+    private static View clickableChild(View row) {
+        if (row == null || !(row instanceof ViewGroup)) {
+            return null;
+        }
+        ViewGroup group = (ViewGroup) row;
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            if (child != null && child.isClickable()) {
+                return child;
+            }
+        }
+        return null;
+    }
+
     /** Clicks the row the way the app's own list would. */
     private static boolean clickItem(Activity list, View item) {
         try {
@@ -577,9 +651,19 @@ final class NativeBatchExport {
                                 listView.getAdapter().getItemId(position)));
                 return true;
             }
-            // A RecyclerView row carries its own click listener.
-            new Handler(Looper.getMainLooper()).post(item::performClick);
-            Log.i(TAG, "native batch: clicked the row directly");
+            // A RecyclerView row carries its own click listener, and on some item
+            // layouts that listener sits on a clickable child rather than on the
+            // row itself, so the row is clicked first and then the first
+            // clickable view inside it.
+            View target = clickableChild(item);
+            new Handler(Looper.getMainLooper()).post(() -> {
+                item.performClick();
+                if (target != null) {
+                    target.performClick();
+                }
+            });
+            Log.i(TAG, "native batch: clicked the row" + (target == null ? ""
+                    : " and its " + target.getClass().getName()));
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "native batch: clicking failed: " + t);
@@ -602,11 +686,16 @@ final class NativeBatchExport {
     }
 
     /**
-     * Asks the editor's fragment to run its picture capture.
+     * Asks the editor to share the note as a picture, which makes it render the
+     * long picture itself.
      *
-     * <p>{@code doPictureCapture} is a Kotlin suspend function, so it is called
-     * with a stand-in continuation: the app then does its own capture exactly as
-     * it does when the user picks "share as picture".
+     * <p>{@code doPictureShare(int, Integer, CaptureCallback)} is the app's own
+     * entry point: its share dialog calls it with {@code (0, null, null)} and a
+     * default-argument mask that fills in exactly those values, and everything
+     * after it - measuring the content, capturing the WebView, writing the
+     * picture - happens inside the app. Calling {@code doPictureCapture}
+     * directly is not an option: it is private and its first argument is built
+     * by the code in between.
      */
     private static boolean triggerCapture(Activity activity) {
         try {
@@ -615,35 +704,29 @@ final class NativeBatchExport {
                 Log.w(TAG, "native batch: the editor fragment was not found");
                 return false;
             }
-            Method trigger = null;
-            for (Method method : fragment.getClass().getDeclaredMethods()) {
-                if (method.getName().equals("doPictureCapture")) {
-                    trigger = method;
-                    break;
-                }
-            }
-            if (trigger == null) {
-                Log.w(TAG, "native batch: the fragment has no doPictureCapture");
+            Log.i(TAG, "native batch: the editor fragment is " + fragment.getClass().getName());
+            Method share = findPictureShare(fragment.getClass());
+            if (share == null) {
+                Log.w(TAG, "native batch: the editor fragment has no doPictureShare");
                 return false;
             }
-            trigger.setAccessible(true);
-            Object[] args = new Object[trigger.getParameterCount()];
-            Class<?>[] types = trigger.getParameterTypes();
+            Class<?>[] types = share.getParameterTypes();
+            Object[] args = new Object[types.length];
             for (int i = 0; i < args.length; i++) {
-                Class<?> type = types[i];
-                if (type.getName().endsWith("Continuation")) {
-                    args[i] = continuation();
-                } else if (type == int.class || type == long.class || type == short.class) {
+                if (types[i] == int.class || types[i] == long.class || types[i] == short.class) {
+                    // The capture type the share dialog itself passes.
                     args[i] = 0;
-                } else if (type == boolean.class) {
+                } else if (types[i] == boolean.class) {
                     args[i] = Boolean.FALSE;
                 } else {
+                    // The background colour and the result callback are both
+                    // null in the app's own call.
                     args[i] = null;
                 }
             }
-            Log.i(TAG, "native batch: calling doPictureCapture with "
-                    + describe(types));
-            trigger.invoke(fragment, args);
+            share.setAccessible(true);
+            Log.i(TAG, "native batch: calling doPictureShare with " + describe(types));
+            share.invoke(fragment, args);
             return true;
         } catch (Throwable t) {
             Log.w(TAG, "native batch: the capture could not be started: " + t);
@@ -651,39 +734,18 @@ final class NativeBatchExport {
         }
     }
 
-    /** A continuation that ignores whatever the coroutine reports. */
-    private static Object continuation() {
-        ClassLoader loader = appLoader;
-        if (loader == null) {
-            return null;
+    /** {@code doPictureShare(int, Integer, CaptureCallback)} on the fragment. */
+    private static Method findPictureShare(Class<?> type) {
+        for (Method method : type.getDeclaredMethods()) {
+            if (!method.getName().equals("doPictureShare")) {
+                continue;
+            }
+            Class<?>[] types = method.getParameterTypes();
+            if (types.length == 3 && types[0] == int.class && types[1] == Integer.class) {
+                return method;
+            }
         }
-        try {
-            // The app's own Kotlin interface, so the proxy is accepted where the
-            // suspend function expects one. Kotlin's stdlib is not on this
-            // module's compile classpath, hence the lookup by name.
-            Class<?> type = Class.forName("kotlin.coroutines.Continuation", false, loader);
-            final Object emptyContext = emptyCoroutineContext(loader);
-            return Proxy.newProxyInstance(loader, new Class<?>[] {type},
-                    (proxy, method, args) -> {
-                        if ("getContext".equals(method.getName())) {
-                            return emptyContext;
-                        }
-                        return null;
-                    });
-        } catch (Throwable t) {
-            Log.w(TAG, "native batch: kotlin.coroutines.Continuation is not available: " + t);
-            return null;
-        }
-    }
-
-    private static Object emptyCoroutineContext(ClassLoader loader) {
-        try {
-            Class<?> type = Class.forName("kotlin.coroutines.EmptyCoroutineContext", false, loader);
-            Field instance = type.getField("INSTANCE");
-            return instance.get(null);
-        } catch (Throwable t) {
-            return null;
-        }
+        return null;
     }
 
     private static Object findFragment(Activity activity) {
@@ -726,7 +788,22 @@ final class NativeBatchExport {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * The screen in front of the user.
+     *
+     * <p>The activity the app resumed last is the honest answer and always
+     * available; the scan of ActivityThread's records is the fallback, and it
+     * fails on its own when the map is being changed underneath it.
+     */
     private static Activity topActivity() {
+        Activity tracked = resumed;
+        if (tracked != null && !tracked.isFinishing() && !tracked.isDestroyed()) {
+            return tracked;
+        }
+        return scannedActivity();
+    }
+
+    private static Activity scannedActivity() {
         try {
             Class<?> thread = Class.forName("android.app.ActivityThread");
             Method current = thread.getMethod("currentActivityThread");
@@ -736,21 +813,27 @@ final class NativeBatchExport {
             java.util.Map<?, ?> map = (java.util.Map<?, ?>) activities.get(value);
             Activity newest = null;
             if (map != null) {
-                for (Object record : map.values()) {
-                    Field paused = record.getClass().getDeclaredField("paused");
-                    paused.setAccessible(true);
-                    if (!(Boolean) paused.get(record)) {
+                for (Object record : map.values().toArray()) {
+                    try {
+                        Field paused = record.getClass().getDeclaredField("paused");
+                        paused.setAccessible(true);
+                        if (Boolean.TRUE.equals(paused.get(record))) {
+                            continue;
+                        }
                         Field activity = record.getClass().getDeclaredField("activity");
                         activity.setAccessible(true);
                         Object candidate = activity.get(record);
                         if (candidate instanceof Activity) {
                             newest = (Activity) candidate;
                         }
+                    } catch (Throwable ignored) {
+                        // a record that does not look like the others is skipped
                     }
                 }
             }
             return newest;
         } catch (Throwable t) {
+            Log.i(TAG, "native batch: the activity list could not be read: " + t);
             return null;
         }
     }

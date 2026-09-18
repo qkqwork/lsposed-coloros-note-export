@@ -37,3 +37,6 @@ Thumbs.db
 desktop.ini
 *.swp
 *~
+
+# Scratch note left behind by a tool run.
+build/last-backup-dir.txt

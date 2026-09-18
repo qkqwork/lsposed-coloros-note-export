@@ -206,6 +206,42 @@ final class Hooks {
     }
 
     /**
+     * Hooks every method of a class whose name starts with a prefix.
+     *
+     * <p>Kotlin appends a hash to the name of a suspend function that has a
+     * value class in its signature — {@code saveBitmap} becomes
+     * {@code saveBitmap-0E7RQCE} — and the hash changes when the app is
+     * rebuilt, so the prefix is what can be relied on.
+     */
+    static int hookMethodsStartingWith(String className, ClassLoader loader, String prefix,
+            XC_MethodHook hook) {
+        Class<?> type = findClass(className, loader);
+        if (type == null) {
+            Log.i(TAG, "no " + className + " in this build");
+            return 0;
+        }
+        int hooked = 0;
+        Class<?> current = type;
+        while (current != null && current != Object.class) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (!method.getName().startsWith(prefix)) {
+                    continue;
+                }
+                try {
+                    method.setAccessible(true);
+                    XposedBridge.hookMethod(method, hook);
+                    hooked++;
+                    Log.i(TAG, "hooked " + className + "." + method.getName());
+                } catch (Throwable t) {
+                    Log.w(TAG, "could not hook " + className + "." + method.getName() + ": " + t);
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return hooked;
+    }
+
+    /**
      * Writes a class's declared methods to the log.
      *
      * <p>Pure reflection with no hooks at all, which is the safe way to find out

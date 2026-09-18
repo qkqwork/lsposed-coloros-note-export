@@ -39,6 +39,8 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\Main.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport$1.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport$3.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport$4.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport$5.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeBatchExport.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeImageExport$1.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NativeImageExport$2.class

@@ -1,64 +1,163 @@
-"""Reads a dexdump listing and prints how the app calls its picture capture.
+"""Reads a dexdump listing and prints how the app drives its picture capture.
 
-    python build/extract-capture.py build/dex2.txt com/nearme/note/activity/richedit/webview/WVNoteViewEditFragment
+    python build/extract-capture.py build/dex2.txt <class> <methods> [extra classes]
 
-dexdump wraps its output at 120 columns, which splits method signatures and
-invoke instructions in half, so the listing is unwrapped first. The interesting
-parts are the definition of the capture method and every call site of it,
-together with the instructions that build the arguments.
+The methods named in the second argument are printed in full, and every invoke
+of them inside the same class is printed together with the instructions that
+build its arguments. That is how the capture entry point and the values the app
+passes to it are recovered.
+
+dexdump wraps long lines at 120 columns. A wrapped continuation starts at
+column zero without an address, while a real record starts either with
+"hexaddress: " at column zero or with whitespace, so the two can be told apart.
+PowerShell's ">" writes UTF-16LE on this machine, so the encoding comes from the
+byte order mark. The listing is streamed: it is a few hundred megabytes.
 """
+import io
 import re
 import sys
 from pathlib import Path
 
 dump = Path(sys.argv[1])
-target = sys.argv[2] if len(sys.argv) > 2 else 'WVNoteViewEditFragment'
-names = sys.argv[3].split(',') if len(sys.argv) > 3 else ['doPictureCapture', 'doPictureShare']
+target = sys.argv[2] if len(sys.argv) > 2 else \
+    'com.nearme.note.activity.richedit.webview.WVNoteViewEditFragment'
+names = (sys.argv[3] if len(sys.argv) > 3
+         else 'doPictureCapture,doPictureShare').split(',')
+extras = [c for c in (sys.argv[4] if len(sys.argv) > 4 else '').split(',') if c]
 
-ADDRESS = re.compile(r'^\s*[0-9a-f]{6,}:\s')
-FIELD = re.compile(r'^\s{2,}\S')
-CONTINUATION = re.compile(r'^\S')
+ADDRESS = re.compile(r'^[0-9a-f]{6,}:\s')
+SIGNATURE = re.compile(r'\|\[[0-9a-f]+\]\s+(?P<sig>\S+?):(?P<type>\([^)]*\)\S+)')
+CLASS_LINE = re.compile(r"^\s*Class descriptor\s+:\s*'(?P<name>[^']+)'")
+NAME_LINE = re.compile(r"^\s*name\s+:\s*'(?P<name>[^']+)'")
+TYPE_LINE = re.compile(r"^\s*type\s+:\s*'(?P<type>[^']*)'")
+ACCESS_LINE = re.compile(r'^\s*access\s+:\s*(?P<access>.*)$')
+CALL = re.compile(r'invoke-\S+\s+\{[^}]*\},\s+\S+?;\s*\.(?P<method>[^\s:]+):')
 
-lines = []
-for raw in dump.read_text(encoding='utf-8', errors='replace').splitlines():
-    if not raw.strip():
-        lines.append('')
-        continue
-    if CONTINUATION.match(raw) and lines and lines[-1]:
-        lines[-1] += raw
-    else:
-        lines.append(raw.rstrip())
 
-print('== %d logical lines ==' % len(lines))
+def plain(descriptor):
+    return descriptor.lstrip('L').rstrip(';').replace('/', '.')
 
-# The class's own methods, so the real signature is visible.
-print('\n== methods of %s ==' % target)
-for i, line in enumerate(lines):
-    if 'Class descriptor' in line and "'L%s;'" % target in line:
-        for j in range(i + 1, min(i + 4000, len(lines))):
-            if 'Class descriptor' in lines[j]:
-                break
-            if re.match(r'\s+name\s+:', lines[j]):
-                name = lines[j].split("'")[1]
-                kind = lines[j + 1] if j + 1 < len(lines) else ''
-                if any(n in name for n in names):
-                    print('  %-40s %s' % (name, kind.strip()))
-        break
 
-# Every call site, with the instructions that set the arguments up.
-for wanted in names:
-    print('\n== call sites of %s ==' % wanted)
-    seen = 0
-    for i, line in enumerate(lines):
-        if 'invoke' not in line or '.%s:' % wanted not in line:
+def detect(path):
+    with open(path, 'rb') as handle:
+        head = handle.read(4)
+    if head[:2] == b'\xff\xfe':
+        return 'utf-16-le'
+    if head[:2] == b'\xfe\xff':
+        return 'utf-16-be'
+    if head[:3] == b'\xef\xbb\xbf':
+        return 'utf-8-sig'
+    return 'utf-8'
+
+
+def logical_lines(path):
+    pending = []
+    with io.open(path, 'r', encoding=detect(path), errors='replace') as handle:
+        for raw in handle:
+            line = raw.rstrip('\r\n')
+            starts_record = ADDRESS.match(line) or line[:1].isspace()
+            if not line.strip():
+                if pending:
+                    yield ''.join(pending)
+                    pending = []
+                yield ''
+            elif starts_record or not pending:
+                if pending:
+                    yield ''.join(pending)
+                pending = [line]
+            else:
+                pending.append(line)
+    if pending:
+        yield ''.join(pending)
+
+
+def main():
+    declarations = []
+    bodies = {}
+    calls = []
+    in_class = False
+    extra_methods = {name: [] for name in extras}
+    extra_class = None
+    pending_name = None
+    pending_access = None
+    current_method = None
+    current_body = []
+
+    def flush():
+        if current_method and current_body:
+            bodies.setdefault(current_method, []).extend(current_body)
+
+    for line in logical_lines(dump):
+        match = CLASS_LINE.match(line)
+        if match:
+            flush()
+            current_method, current_body = None, []
+            plain_name = plain(match.group('name'))
+            in_class = plain_name == target
+            extra_class = plain_name if plain_name in extra_methods else None
+            pending_name = None
             continue
-        if target not in line:
-            continue
-        seen += 1
-        print('\n---- call %d (line %d) ----' % (seen, i + 1))
-        start = i
-        while start > 0 and lines[start - 1].strip() and not lines[start - 1].strip().startswith('#'):
-            start -= 1
-        for j in range(max(start, i - 45), i + 1):
-            print(lines[j])
-    print('\ntotal call sites: %d' % seen)
+
+        if in_class or extra_class:
+            name = NAME_LINE.match(line)
+            if name:
+                pending_name = name.group('name')
+            else:
+                access = ACCESS_LINE.match(line)
+                if access and pending_name:
+                    pending_access = access.group('access')
+                else:
+                    kind = TYPE_LINE.match(line)
+                    if kind and pending_name:
+                        if in_class:
+                            declarations.append(
+                                (pending_name, kind.group('type'), (pending_access or '').strip()))
+                        else:
+                            extra_methods[extra_class].append(
+                                (pending_name, kind.group('type'), (pending_access or '').strip()))
+                        pending_name = None
+                        pending_access = None
+
+        signature = SIGNATURE.search(line)
+        if signature:
+            flush()
+            current_method = signature.group('sig') + ':' + signature.group('type')
+            current_body = [line]
+        elif current_method is not None:
+            current_body.append(line)
+
+        if in_class and 'invoke' in line:
+            call = CALL.search(line)
+            if call and call.group('method') in names:
+                calls.append((current_method, list(current_body), line))
+    flush()
+
+    print('== %s ==' % target)
+    print('\n-- declarations of interest --')
+    for method, kind, access in declarations:
+        if method in names:
+            print('  %-32s %-24s %s' % (method, access, kind))
+
+    print('\n-- bodies --')
+    for name in names:
+        for method, body in bodies.items():
+            if not method.startswith(target + '.' + name + ':'):
+                continue
+            print('\n### %s' % method)
+            for entry in body:
+                print('  ' + entry)
+
+    print('\n== %d call site(s) ==' % len(calls))
+    for index, (method, body, line) in enumerate(calls, 1):
+        print('\n---- call %d in %s ----' % (index, method))
+        for entry in body:
+            print('  ' + entry)
+        print('  >>> ' + line)
+
+    for name in extras:
+        print('\n== methods of %s ==' % name)
+        for method, kind, access in extra_methods[name]:
+            print('  %-32s %-24s %s' % (method, access, kind))
+
+
+main()
