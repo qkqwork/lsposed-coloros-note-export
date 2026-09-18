@@ -48,6 +48,13 @@ public class ConfigActivity extends Activity {
     private EditText watermarkText;
     /** What a long picture is drawn on: automatic, always white or always dark. */
     private RadioGroup backgroundGroup;
+    /** How many notes to export, and how the files are named. */
+    private EditText limitBox;
+    private CheckBox numberedBox;
+    private CheckBox foldersBox;
+    private CheckBox stampedBox;
+    private CheckBox skipBox;
+    private CheckBox debugBox;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -100,6 +107,38 @@ public class ConfigActivity extends Activity {
         recycledBox.setText("包含回收站中的便签");
         recycledBox.setChecked(true);
         root.addView(recycledBox);
+
+        limitBox = new EditText(this);
+        limitBox.setHint("导出条数（0 或留空 = 全部）");
+        limitBox.setSingleLine(true);
+        limitBox.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        root.addView(limitBox);
+        root.addView(hint("先用 1–2 条试格式，确认满意再跑全部。"));
+
+        numberedBox = new CheckBox(this);
+        numberedBox.setText("文件名带序号（001_标题.png，顺序与便签一致）");
+        numberedBox.setChecked(true);
+        root.addView(numberedBox);
+
+        foldersBox = new CheckBox(this);
+        foldersBox.setText("按分类分文件夹");
+        foldersBox.setChecked(true);
+        root.addView(foldersBox);
+
+        stampedBox = new CheckBox(this);
+        stampedBox.setText("每次导出放到新的时间戳文件夹");
+        stampedBox.setChecked(true);
+        root.addView(stampedBox);
+
+        skipBox = new CheckBox(this);
+        skipBox.setText("跳过已存在的文件（配合上面取消勾选，可接着上次继续导出）");
+        root.addView(skipBox);
+
+        debugBox = new CheckBox(this);
+        debugBox.setText("开启调试日志（详细诊断，导出很多次都不用开）");
+        root.addView(debugBox);
+        root.addView(hint("调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，"
+                + "只在排查问题时勾选。"));
 
         root.addView(section("长图底色"));
         root.addView(hint("便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。"
@@ -270,7 +309,20 @@ public class ConfigActivity extends Activity {
         options.wordLayout = layoutGroup.getCheckedRadioButtonId() == 2
                 ? ExportOptions.WordLayout.PER_NOTE : ExportOptions.WordLayout.SINGLE;
         options.includeRecycled = recycledBox.isChecked();
-        options.timestampedFolder = true;
+        options.timestampedFolder = stampedBox == null || stampedBox.isChecked();
+        options.numberedNames = numberedBox == null || numberedBox.isChecked();
+        options.categoryFolders = foldersBox == null || foldersBox.isChecked();
+        options.skipExisting = skipBox != null && skipBox.isChecked();
+        options.debug = debugBox != null && debugBox.isChecked();
+        options.limit = 0;
+        if (limitBox != null) {
+            try {
+                options.limit = Math.max(0,
+                        Integer.parseInt(limitBox.getText().toString().trim()));
+            } catch (NumberFormatException ignored) {
+                // an empty or malformed count simply means "all of them"
+            }
+        }
         switch (backgroundGroup.getCheckedRadioButtonId()) {
             case 2:
                 options.background = ExportOptions.Background.WHITE;
@@ -438,6 +490,26 @@ public class ConfigActivity extends Activity {
         }
         backgroundGroup.check(backgroundId);
 
+        String limit = prefs.getString(ConfigContract.COLUMN_LIMIT, "");
+        if (limitBox != null) {
+            limitBox.setText(limit);
+        }
+        if (numberedBox != null) {
+            numberedBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_NUMBERED, true));
+        }
+        if (foldersBox != null) {
+            foldersBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_FOLDERS, true));
+        }
+        if (stampedBox != null) {
+            stampedBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_STAMPED, true));
+        }
+        if (skipBox != null) {
+            skipBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_SKIP, false));
+        }
+        if (debugBox != null) {
+            debugBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_DEBUG, false));
+        }
+
         WatermarkSettings watermark = WatermarkSettings.read(this);
         watermarkGroup.check(watermarkRadioId(watermark.mode));
         watermarkText.setText(watermark.text);
@@ -467,6 +539,13 @@ public class ConfigActivity extends Activity {
                                 : options.background == ExportOptions.Background.DARK
                                         ? ConfigContract.BACKGROUND_DARK
                                         : ConfigContract.BACKGROUND_AUTO)
+                .putString(ConfigContract.COLUMN_LIMIT,
+                        limitBox == null ? "" : limitBox.getText().toString().trim())
+                .putBoolean(ConfigContract.COLUMN_NUMBERED, options.numberedNames)
+                .putBoolean(ConfigContract.COLUMN_FOLDERS, options.categoryFolders)
+                .putBoolean(ConfigContract.COLUMN_STAMPED, options.timestampedFolder)
+                .putBoolean(ConfigContract.COLUMN_SKIP, options.skipExisting)
+                .putBoolean(ConfigContract.COLUMN_DEBUG, options.debug)
                 .apply();
         // The watermark travels to the Notes process through the provider and a
         // mirrored file, so both are written here, where the user just decided.

@@ -39,6 +39,12 @@ public final class ExportRequest {
     public static final String KEY_LIMIT = "limit";
     /** What a long picture is drawn on: {@code auto}, {@code white} or {@code dark}. */
     public static final String KEY_BACKGROUND = "bg";
+    /** File naming: numbers in front, a folder per category, leave existing files. */
+    public static final String KEY_NUMBERED = "numbered";
+    public static final String KEY_FOLDERS = "folders";
+    public static final String KEY_SKIP = "skip";
+    /** Install the diagnostic probes for this export. */
+    public static final String KEY_DEBUG = "debug";
 
     /** Result of reading the file: the options plus the request id. */
     public static final class Request {
@@ -120,6 +126,18 @@ public final class ExportRequest {
                 .append(options.background == ExportOptions.Background.WHITE
                         ? "white"
                         : options.background == ExportOptions.Background.AUTO ? "auto" : "dark");
+        if (!options.numberedNames) {
+            sb.append(';').append(KEY_NUMBERED).append("=0");
+        }
+        if (!options.categoryFolders) {
+            sb.append(';').append(KEY_FOLDERS).append("=0");
+        }
+        if (options.skipExisting) {
+            sb.append(';').append(KEY_SKIP).append("=1");
+        }
+        if (options.debug) {
+            sb.append(';').append(KEY_DEBUG).append("=1");
+        }
         return sb.toString();
     }
 
@@ -184,6 +202,14 @@ public final class ExportRequest {
                 } else {
                     options.background = ExportOptions.Background.AUTO;
                 }
+            } else if (KEY_NUMBERED.equals(key)) {
+                options.numberedNames = !"0".equals(value);
+            } else if (KEY_FOLDERS.equals(key)) {
+                options.categoryFolders = !"0".equals(value);
+            } else if (KEY_SKIP.equals(key)) {
+                options.skipExisting = !"0".equals(value);
+            } else if (KEY_DEBUG.equals(key)) {
+                options.debug = !"0".equals(value);
             }
         }
         return options;

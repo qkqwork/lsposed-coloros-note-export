@@ -90,12 +90,44 @@ public class Main implements IXposedHookLoadPackage {
         hookExportTrigger(param);
         hookApplicationStart(param.classLoader);
         WatermarkHook.install(param.classLoader);
-        ShareProbe.install(param.classLoader);
-        // One narrow hook, plus a reflection-only inventory: hooking every method
-        // of the capture classes used to make the app unlaunchable.
-        CaptureProbe.install(param.classLoader);
+        // The diagnostic probes are not installed here any more. They hook whole
+        // families of methods and print inventories of the app's classes, which
+        // is noise in every day's log and a cost at every app start; they are
+        // installed on demand instead, when an export asks for debug logging.
+        injectedLoader = param.classLoader;
         NativeImageExport.install(param.classLoader);
         NativeBatchExport.install(param.classLoader);
+    }
+
+    /** The hooked app's loader, so the probes can be installed later on demand. */
+    private static volatile ClassLoader injectedLoader;
+    private static volatile boolean probesInstalled;
+
+    /**
+     * Installs the diagnostic probes, once, for a debug export.
+     *
+     * <p>Hooks can be added while the app is running, which is what makes this
+     * possible: a user who turns debug logging on gets the detail immediately
+     * rather than after the next launch of the Notes app.
+     */
+    private static void enableProbes() {
+        ClassLoader loader = injectedLoader;
+        if (loader == null || probesInstalled) {
+            return;
+        }
+        synchronized (Main.class) {
+            if (probesInstalled) {
+                return;
+            }
+            probesInstalled = true;
+        }
+        Log.i(TAG, "debug logging is on: installing the diagnostic probes");
+        try {
+            ShareProbe.install(loader);
+            CaptureProbe.install(loader);
+        } catch (Throwable t) {
+            Log.w(TAG, "the probes could not be installed: " + t);
+        }
     }
 
     // ------------------------------------------------------ the export trigger
@@ -192,6 +224,9 @@ public class Main implements IXposedHookLoadPackage {
         ExportRequest.Request request = ExportRequest.read();
         ExportOptions options = selection == null || selection.length() == 0
                 ? request.options : ExportRequest.parseSelection(selection);
+        if (options.debug) {
+            enableProbes();
+        }
         // Which thread this runs on decides whether the WebView-based image
         // export can work at all: WebView callbacks are delivered on the main
         // thread, so an export occupying that thread can never see them.

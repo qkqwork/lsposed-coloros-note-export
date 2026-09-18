@@ -3,6 +3,7 @@ package com.dsh.noteexport;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -131,6 +132,41 @@ public final class ExportSink {
         sink.stream = new FileOutputStream(target);
         sink.displayPath = target.getPath();
         return sink;
+    }
+
+    /**
+     * Whether that destination already holds a file of this name.
+     *
+     * <p>Used to resume an export that was interrupted: asked before opening a
+     * destination, so a note that is already exported is left alone instead of
+     * being drawn and written again.
+     */
+    public static boolean exists(Context context, String relativeDir, String name) {
+        String relativePath = relativeDir == null || relativeDir.length() == 0
+                ? Environment.DIRECTORY_DOWNLOADS + "/"
+                : Environment.DIRECTORY_DOWNLOADS + "/" + relativeDir + "/";
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                String[] projection = {MediaStore.Downloads._ID};
+                String where = MediaStore.Downloads.DISPLAY_NAME + "=? AND "
+                        + MediaStore.Downloads.RELATIVE_PATH + "=?";
+                Cursor cursor = context.getContentResolver().query(
+                        MediaStore.Downloads.EXTERNAL_CONTENT_URI, projection, where,
+                        new String[] {name, relativePath}, null);
+                if (cursor != null) {
+                    try {
+                        return cursor.moveToFirst();
+                    } finally {
+                        cursor.close();
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not ask MediaStore about " + name + ": " + t);
+        }
+        File dir = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOWNLOADS), relativeDir == null ? "" : relativeDir);
+        return new File(dir, name).exists();
     }
 
     public OutputStream stream() {

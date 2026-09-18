@@ -57,6 +57,30 @@ public final class ExportOptions {
      */
     public int limit;
 
+    /** Put a number in front of each file name, so the order is the note order. */
+    public boolean numberedNames = true;
+
+    /** Keep each note's files in a folder of its category. */
+    public boolean categoryFolders = true;
+
+    /**
+     * Leave a note alone when its file is already there.
+     *
+     * <p>Combined with a fixed output folder rather than a timestamped one, this
+     * is what makes a long export resumable: run it again and it picks up where
+     * the interrupted one stopped instead of drawing everything from the top.
+     */
+    public boolean skipExisting;
+
+    /**
+     * Install the diagnostic probes and log their detail.
+     *
+     * <p>Off by default: they hook whole families of the app's methods and print
+     * inventories of its classes, which is worth having while something is being
+     * investigated and is only noise the rest of the time.
+     */
+    public boolean debug;
+
     public ExportOptions() {
     }
 

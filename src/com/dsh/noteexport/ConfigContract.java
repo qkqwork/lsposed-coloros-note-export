@@ -78,6 +78,12 @@ public final class ConfigContract {
     public static final String COLUMN_WORD_LAYOUT = "word_layout";
     public static final String COLUMN_INCLUDE_RECYCLED = "include_recycled";
     public static final String COLUMN_BACKGROUND = "image_background";
+    public static final String COLUMN_LIMIT = "export_limit";
+    public static final String COLUMN_NUMBERED = "numbered_names";
+    public static final String COLUMN_FOLDERS = "category_folders";
+    public static final String COLUMN_STAMPED = "timestamped_folder";
+    public static final String COLUMN_SKIP = "skip_existing";
+    public static final String COLUMN_DEBUG = "debug_logging";
     public static final String COLUMN_WATERMARK_MODE = "watermark_mode";
     public static final String COLUMN_WATERMARK_TEXT = "watermark_text";
 

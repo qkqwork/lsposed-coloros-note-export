@@ -528,5 +528,7 @@ public final class NoteExporter {
         int files;
         int attachments;
         int failed;
+        /** Notes left alone because their file was already there. */
+        int skipped;
     }
 }

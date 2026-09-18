@@ -591,7 +591,7 @@ final class NativeBatchExport {
                 continue;
             }
             failuresInARow = 0;
-            if (save(context, note, i + 1, root, picture, stats)) {
+            if (save(context, note, i + 1, root, picture, stats, options)) {
                 stats.notes++;
             } else {
                 stats.failed++;
@@ -608,11 +608,18 @@ final class NativeBatchExport {
     }
 
     private static boolean save(Context context, Note note, int index, String root,
-            Bitmap picture, NoteExporter.Stats stats) {
-        String dir = ExportSink.join(root,
-                ExportSink.sanitize(NoteExporter.categoryOf(note)));
-        String name = String.format(java.util.Locale.US, "%03d_", index)
+            Bitmap picture, NoteExporter.Stats stats, ExportOptions options) {
+        String dir = options.categoryFolders
+                ? ExportSink.join(root, ExportSink.sanitize(NoteExporter.categoryOf(note)))
+                : root;
+        String name = (options.numberedNames
+                        ? String.format(java.util.Locale.US, "%03d_", index) : "")
                 + ExportSink.fileName(NoteExporter.titleOf(note), "无标题") + ".png";
+        if (options.skipExisting && ExportSink.exists(context, dir, name)) {
+            Log.i(TAG, "native batch: " + name + " is already there, left alone");
+            stats.skipped++;
+            return true;
+        }
         ExportSink sink = null;
         try {
             sink = ExportSink.open(context, dir, name, "image/png");
