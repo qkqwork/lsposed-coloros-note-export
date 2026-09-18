@@ -40,3 +40,6 @@ desktop.ini
 
 # Scratch note left behind by a tool run.
 build/last-backup-dir.txt
+
+# Note text dumped for a single investigation; it is the user's own writing.
+build/note-text*.txt

@@ -1,5 +1,7 @@
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe$1.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe$2.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe$3.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe$4.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe$StepTracer.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\CaptureProbe.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ConfigActivity.class

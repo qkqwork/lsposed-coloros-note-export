@@ -41,7 +41,7 @@ final class CaptureProbe {
             "com.nearme.note.activity.richedit.webview.WVNoteViewEditFragment";
 
     /** How many calls of the hooked method are logged. */
-    private static final int CALLS = 6;
+    private static final int CALLS = 25;
 
     /**
      * The capture and assembly steps, by name.
@@ -57,11 +57,21 @@ final class CaptureProbe {
                     "captureWebView"},
             {"com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper",
                     "doCaptureWebView"},
+            // The two inner paths. The app's own share produces text with one of
+            // them; if a driven capture takes the other, that is the difference
+            // between a picture with glyphs and one without.
+            {"com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper",
+                    "captureByDraw"},
+            {"com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper",
+                    "captureByPixelCopy"},
+            {"com.nearme.note.activity.richedit.webview.WVCaptureScreenHelper",
+                    "captureCurrentScreen"},
             {"com.nearme.note.util.ScreenShotUtils", "captureCurrentScreen"},
             {"com.nearme.note.util.ScreenShotUtils", "createListBitmap"},
-            {"com.nearme.note.util.ScreenShotUtils", "mergeAndSaveImagesAsLongBitmap"},
-            {"com.nearme.note.util.ScreenShotUtils", "getViewDrawingCache"},
             {"com.nearme.note.util.CaptureScreenUtils", "captureCurrentScreen"},
+            {"com.nearme.note.util.CaptureScreenUtils", "createListBitmap"},
+            {"com.nearme.note.util.CaptureScreenUtils", "mergeAndSaveImagesAsLongBitmap"},
+            {"com.nearme.note.util.ScreenShotUtils", "getViewDrawingCache"},
             {"com.nearme.note.activity.edit.SaveImageAndShare", "createImageFile"},
             {"com.nearme.note.activity.edit.SaveImageAndShare", "getCaptureBitmap"},
             {"com.nearme.note.activity.edit.SaveImageAndShare", "fillItemCapture"},
@@ -98,6 +108,54 @@ final class CaptureProbe {
                                 + " argument(s) from " + caller());
                     }
                 });
+        // The editor's own share entry point, with its argument *values*: the
+        // page's JavaScript calls it with a background colour and a callback,
+        // while the native dialog calls it with neither, and the two produce
+        // very different pictures. Tapping share once in the app therefore says
+        // exactly what a driven call has to pass.
+        int shares = Hooks.hookMethodsNamed(EDITOR_FRAGMENT, loader, "doPictureShare",
+                new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) {
+                        StringBuilder values = new StringBuilder();
+                        for (Object argument : param.args) {
+                            if (values.length() > 0) {
+                                values.append(", ");
+                            }
+                            if (argument == null) {
+                                values.append("null");
+                            } else if (argument instanceof Number || argument instanceof Boolean) {
+                                values.append(argument.getClass().getSimpleName())
+                                        .append('=').append(argument);
+                            } else {
+                                values.append(argument.getClass().getName());
+                            }
+                        }
+                        log("doPictureShare(" + values + ") from " + caller());
+                    }
+                }, true);
+        shares += Hooks.hookMethodsNamed(
+                "com.nearme.note.activity.richedit.webview.WVNoteViewEditFragmentShareHelper",
+                loader, "doPictureShare", new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) {
+                        StringBuilder values = new StringBuilder();
+                        for (Object argument : param.args) {
+                            if (values.length() > 0) {
+                                values.append(", ");
+                            }
+                            if (argument == null) {
+                                values.append("null");
+                            } else if (argument instanceof Number || argument instanceof Boolean) {
+                                values.append(argument.getClass().getSimpleName())
+                                        .append('=').append(argument);
+                            } else {
+                                values.append(argument.getClass().getName());
+                            }
+                        }
+                        log("shareHelper.doPictureShare(" + values + ")");
+                    }
+                });
         // The editor's own entry point: what it is opened with tells us how to
         // open it for any other note.
         Hooks.hookMethodsNamed(EDITOR_ACTIVITY, loader, "onCreate", new XC_MethodHook() {
@@ -120,7 +178,7 @@ final class CaptureProbe {
                 }
             }
         });
-        Log.i(TAG, "capture probe: hooked " + total + " capture step(s) + "
+        Log.i(TAG, "capture probe: hooked " + total + " capture step(s) + " + shares + " share entry + "
                 + elements + " captureElements + the editor's onCreate — nothing else");
     }
 
@@ -149,7 +207,36 @@ final class CaptureProbe {
                 types.append(argument == null ? "null"
                         : argument.getClass().getName());
             }
-            log("step -> " + step + " #" + calls + "(" + types + ") from " + caller());
+            log("step -> " + step + " #" + calls + "(" + types + ")"
+                    + viewState(step, param) + " from " + caller());
+        }
+
+        /**
+         * What the view being captured looks like right now.
+         *
+         * <p>The pixel-copy path can only work on a view that is attached to a
+         * visible window, so whether the app's own share and a driven capture
+         * differ here is exactly what needs to be known.
+         */
+        private String viewState(String step, MethodHookParam param) {
+            if (!step.startsWith("captureBy")) {
+                return "";
+            }
+            try {
+                if (param.args.length == 0 || !(param.args[0] instanceof android.view.View)) {
+                    return "";
+                }
+                android.view.View view = (android.view.View) param.args[0];
+                String bitmap = "";
+                if (param.args.length > 1 && param.args[1] instanceof android.graphics.Bitmap) {
+                    android.graphics.Bitmap target = (android.graphics.Bitmap) param.args[1];
+                    bitmap = ", bitmap=" + target.getWidth() + "x" + target.getHeight();
+                }
+                return " [view attached=" + view.isAttachedToWindow() + " shown=" + view.isShown()
+                        + " " + view.getWidth() + "x" + view.getHeight() + bitmap + "]";
+            } catch (Throwable ignored) {
+                return "";
+            }
         }
 
         @Override

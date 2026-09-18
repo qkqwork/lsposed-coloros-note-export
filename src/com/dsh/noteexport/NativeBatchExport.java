@@ -68,6 +68,12 @@ final class NativeBatchExport {
     private static final long CAPTURE_WAIT_SECONDS = 40;
     private static final long SETTLE_MILLIS = 700;
 
+    /**
+     * What a dark note is read on. Measured from the picture the app itself drew
+     * for one of this device's notes: its background is 13,13,13.
+     */
+    private static final int DARK_NOTE_BACKGROUND = 0xFF0D0D0D;
+
     /** The note being captured, or null when no batch is running. */
     private static volatile Note pending;
     /** The pages the app rendered for that note, in the order they arrived. */
@@ -93,6 +99,9 @@ final class NativeBatchExport {
         XC_MethodHook copier = new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
+                if (param.args.length > 1 && param.args[1] instanceof String) {
+                    Log.i(TAG, "native batch: the app writes " + param.args[1]);
+                }
                 if (param.args.length > 0) {
                     collect(param.args[0]);
                 }
@@ -172,7 +181,53 @@ final class NativeBatchExport {
             pages.add(bitmap);
         }
         Log.i(TAG, "native batch: the app rendered a " + bitmap.getWidth() + "x"
-                + bitmap.getHeight() + " page");
+                + bitmap.getHeight() + " page, " + describePixels(bitmap));
+    }
+
+    /**
+     * What a page is made of, sampled rather than scanned in full.
+     *
+     * <p>A page whose text is drawn in the colour of its own background looks
+     * empty, and a page whose background is see-through only shows its pictures
+     * once it is composited on the right colour. Counting transparent, light and
+     * dark pixels tells the two apart.
+     */
+    private static String describePixels(Bitmap bitmap) {
+        try {
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            int step = Math.max(1, width / 120);
+            int[] row = new int[width];
+            long transparent = 0;
+            long light = 0;
+            long dark = 0;
+            long total = 0;
+            for (int y = 0; y < height; y += Math.max(1, height / 120)) {
+                bitmap.getPixels(row, 0, width, 0, y, width, 1);
+                for (int x = 0; x < width; x += step) {
+                    int pixel = row[x];
+                    total++;
+                    int alpha = (pixel >>> 24) & 0xFF;
+                    if (alpha < 16) {
+                        transparent++;
+                        continue;
+                    }
+                    int luminance = ((pixel >> 16 & 0xFF) * 299 + (pixel >> 8 & 0xFF) * 587
+                            + (pixel & 0xFF) * 114) / 1000;
+                    if (luminance >= 235) {
+                        light++;
+                    } else if (luminance <= 60) {
+                        dark++;
+                    }
+                }
+            }
+            return String.format(java.util.Locale.US,
+                    "alpha=%s transparent=%.1f%% light=%.1f%% dark=%.1f%% (of %d samples)",
+                    bitmap.hasAlpha(), transparent * 100.0 / total, light * 100.0 / total,
+                    dark * 100.0 / total, total);
+        } catch (Throwable t) {
+            return "pixels could not be read: " + t;
+        }
     }
 
     /**
@@ -183,22 +238,21 @@ final class NativeBatchExport {
      * them in the order they arrived reproduces the note. If the app ever merges
      * the slices itself, that finished picture is used instead.
      */
-    private static Bitmap combined() {
-        Bitmap appPicture = merged;
-        if (appPicture != null) {
-            Log.i(TAG, "native batch: the app merged its pages into one picture");
-            return trimmed(appPicture);
-        }
+    private static Bitmap combined(int background) {
         List<Bitmap> captured;
         synchronized (pages) {
             captured = new ArrayList<>(pages);
         }
+        Bitmap appPicture = merged;
+        if (appPicture != null) {
+            Log.i(TAG, "native batch: the app merged its pages into one picture");
+            captured = new ArrayList<>();
+            captured.add(appPicture);
+        }
         if (captured.isEmpty()) {
             return null;
         }
-        if (captured.size() == 1) {
-            return trimmed(captured.get(0));
-        }
+
         int width = 0;
         int height = 0;
         for (Bitmap page : captured) {
@@ -220,18 +274,91 @@ final class NativeBatchExport {
                     tallest = page;
                 }
             }
-            return trimmed(tallest);
+            return composited(tallest, background);
         }
         Canvas canvas = new Canvas(stitched);
-        canvas.drawColor(Color.WHITE);
+        // The pages are see-through: the editor renders white text on nothing and
+        // the app shows them over the colour of the note's background. Stacking
+        // them on white instead is what made a dark note's text disappear.
+        canvas.drawColor(background);
         int top = 0;
         for (Bitmap page : captured) {
             canvas.drawBitmap(page, 0, top, null);
             top += page.getHeight();
         }
         Log.i(TAG, "native batch: stacked " + captured.size() + " pages into " + width + "x"
-                + height);
-        return trimmed(stitched);
+                + height + " on 0x" + Integer.toHexString(background));
+        return trimmed(stitched, background);
+    }
+
+    /** Puts a single see-through page on the note's background. */
+    private static Bitmap composited(Bitmap page, int background) {
+        if (!page.hasAlpha()) {
+            return trimmed(page, background);
+        }
+        Bitmap flat = Bitmap.createBitmap(page.getWidth(), page.getHeight(),
+                Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(flat);
+        canvas.drawColor(background);
+        canvas.drawBitmap(page, 0, 0, null);
+        return trimmed(flat, background);
+    }
+
+    /**
+     * The colour a note's see-through pages have to be stacked on.
+     *
+     * <p>The editor hands its pages over with the text drawn and no background at
+     * all, and the app itself puts them on the colour of the note's skin. White
+     * text on a white backdrop is invisible, which is what an export that "has
+     * everything except the text" is: the ink says which way round the note is
+     * meant to be read, so the backdrop is chosen to be the opposite of it.
+     *
+     * <p>{@code 0x0D0D0D} is the colour the app uses behind a dark note, measured
+     * from the picture the app itself drew for one.
+     */
+    private static int backgroundFor(List<Bitmap> pages) {
+        long lightInk = 0;
+        long darkInk = 0;
+        for (Bitmap page : pages) {
+            long[] balance = inkBalance(page);
+            lightInk += balance[0];
+            darkInk += balance[1];
+        }
+        boolean lightOnDark = lightInk > darkInk;
+        Log.i(TAG, "native batch: ink is " + (lightOnDark ? "light" : "dark")
+                + " (" + lightInk + " light vs " + darkInk + " dark samples), so the pages go on "
+                + (lightOnDark ? "0xff0d0d0d" : "white"));
+        return lightOnDark ? DARK_NOTE_BACKGROUND : Color.WHITE;
+    }
+
+    /** Counts the opaque light and dark pixels of a page. */
+    private static long[] inkBalance(Bitmap page) {
+        long light = 0;
+        long dark = 0;
+        try {
+            int width = page.getWidth();
+            int height = page.getHeight();
+            int[] row = new int[width];
+            for (int y = 0; y < height; y += Math.max(1, height / 90)) {
+                page.getPixels(row, 0, width, 0, y, width, 1);
+                for (int x = 0; x < width; x += Math.max(1, width / 90)) {
+                    int pixel = row[x];
+                    if (((pixel >>> 24) & 0xFF) < 16) {
+                        continue;
+                    }
+                    int luminance = ((pixel >> 16 & 0xFF) * 299 + (pixel >> 8 & 0xFF) * 587
+                            + (pixel & 0xFF) * 114) / 1000;
+                    if (luminance >= 200) {
+                        light++;
+                    } else if (luminance <= 90) {
+                        dark++;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+            // a page that cannot be sampled simply does not vote
+        }
+        return new long[] {light, dark};
     }
 
     /**
@@ -239,10 +366,10 @@ final class NativeBatchExport {
      *
      * <p>The editor measures its own height, which is the whole screen, so a
      * note that ends half way down comes back with thousands of blank rows under
-     * it. Only rows that are white all the way across are dropped, and only from
-     * the bottom, so nothing that was drawn is lost.
+     * it. Only rows that are the background colour all the way across are
+     * dropped, and only from the bottom, so nothing that was drawn is lost.
      */
-    private static Bitmap trimmed(Bitmap picture) {
+    private static Bitmap trimmed(Bitmap picture, int background) {
         int width = picture.getWidth();
         int height = picture.getHeight();
         int[] row = new int[width];
@@ -251,7 +378,7 @@ final class NativeBatchExport {
             picture.getPixels(row, 0, width, 0, bottom - 1, width, 1);
             boolean empty = true;
             for (int pixel : row) {
-                if ((pixel & 0x00F0F0F0) != 0x00F0F0F0) {
+                if (!matches(pixel, background)) {
                     empty = false;
                     break;
                 }
@@ -266,6 +393,18 @@ final class NativeBatchExport {
         }
         Log.i(TAG, "native batch: trimmed " + (height - bottom) + " empty rows at the bottom");
         return Bitmap.createBitmap(picture, 0, 0, width, bottom);
+    }
+
+    /** Whether a pixel is the background colour, allowing for rounding. */
+    private static boolean matches(int pixel, int background) {
+        if (((pixel >>> 24) & 0xFF) < 16) {
+            return true;
+        }
+        int red = Math.abs((pixel >> 16 & 0xFF) - (background >> 16 & 0xFF));
+        int green = Math.abs((pixel >> 8 & 0xFF) - (background >> 8 & 0xFF));
+        int blue = Math.abs((pixel & 0xFF) - (background & 0xFF));
+        int tolerance = ((pixel >> 16 & 0xFF) > 200 && (background >> 16 & 0xFF) > 200) ? 16 : 8;
+        return red <= tolerance && green <= tolerance && blue <= tolerance;
     }
 
     /** The app's own picture of every note, one note at a time. */
@@ -430,7 +569,13 @@ final class NativeBatchExport {
             Log.w(TAG, "native batch: the app never showed its preview screen");
         }
 
-        Bitmap result = round == thisRound ? combined() : null;
+        // The colour the pages have to be stacked on is the opposite of the ink
+        // they carry, because the app hands them over with no background at all.
+        List<Bitmap> captured;
+        synchronized (pages) {
+            captured = new ArrayList<>(pages);
+        }
+        Bitmap result = round == thisRound ? combined(backgroundFor(captured)) : null;
         pending = null;
         merged = null;
         synchronized (pages) {
