@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.dsh.noteexport"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
+
+    <!-- The settings screen needs to see whether the Notes app is installed. -->
+    <queries>
+        <package android:name="com.coloros.note" />
+    </queries>
+
+    <!--
+      No storage permission is declared on purpose: the export goes through
+      MediaStore, which on Android 10+ lets an app write its own files into the
+      shared Downloads folder, and the request file is written the same way.
+    -->
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:hasCode="true">
+
+        <activity
+            android:name=".ConfigActivity"
+            android:label="@string/app_name"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Read-only settings surface of the module. The export itself travels in
+          a request file, so this provider is only here for introspection and for
+          other tooling to see what the module is configured to do.
+        -->
+        <provider
+            android:name=".ConfigProvider"
+            android:authorities="com.dsh.noteexport.settings"
+            android:exported="true" />
+
+        <meta-data android:name="xposedmodule" android:value="true" />
+        <meta-data android:name="xposeddescription"
+            android:value="在便签进程内批量导出全部便签为 Word 文档或长图，保留分类结构" />
+        <meta-data android:name="xposedminversion" android:value="93" />
+        <meta-data android:name="xposedscope" android:value="com.coloros.note" />
+    </application>
+</manifest>
