@@ -61,6 +61,7 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NoteStore$S
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\NoteStore.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\PipelineProbe$Tracer.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\PipelineProbe.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ProgressNotifier.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ShareProbe$1.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ShareProbe$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\dsh\noteexport\ShareProbe$3.class

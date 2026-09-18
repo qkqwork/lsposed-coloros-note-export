@@ -19,6 +19,7 @@ D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\NoteExporter.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\NoteHtml.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\NoteStore.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\PipelineProbe.java
+D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\ProgressNotifier.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\ShareProbe.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\WatermarkHook.java
 D:\AndroidProjects\oppo-note-export\src\com\dsh\noteexport\WatermarkSettings.java

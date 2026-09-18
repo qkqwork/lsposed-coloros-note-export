@@ -542,14 +542,17 @@ final class NativeBatchExport {
 
         Activity list = openNoteList(context);
         if (list == null) {
+            ProgressNotifier.clear(context);
             return new NoteExporter.Result(false,
                     "打不开便签列表界面：请先把便签应用切到前台再导出", root);
         }
 
+        ProgressNotifier.start(context, limit);
         int failuresInARow = 0;
         for (int i = 0; i < limit; i++) {
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
+            ProgressNotifier.progress(context, i, limit, NoteExporter.titleOf(note));
             if (topActivity() == null || !topActivity().getClass().getName().equals(LIST_ACTIVITY)) {
                 list = openNoteList(context);
                 if (list == null) {
@@ -600,6 +603,7 @@ final class NativeBatchExport {
         if (stats.failed > 0) {
             message += "，" + stats.failed + " 条失败";
         }
+        ProgressNotifier.finish(context, message + "\n位置：" + root, stats.notes > 0);
         return new NoteExporter.Result(stats.notes > 0, message, root);
     }
 
