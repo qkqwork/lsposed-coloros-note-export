@@ -553,6 +553,17 @@ final class NativeBatchExport {
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
             ProgressNotifier.progress(context, i, limit, NoteExporter.titleOf(note));
+            if (options.skipExisting) {
+                // Asked before the note is drawn, not after: drawing one takes
+                // several seconds, and resuming an interrupted export should only
+                // pay that for the notes it still has to do.
+                String[] target = targetOf(note, i + 1, root, options);
+                if (ExportSink.exists(context, target[0], target[1])) {
+                    Log.i(TAG, "native batch: " + target[1] + " is already there, left alone");
+                    stats.skipped++;
+                    continue;
+                }
+            }
             if (topActivity() == null || !topActivity().getClass().getName().equals(LIST_ACTIVITY)) {
                 list = openNoteList(context);
                 if (list == null) {
@@ -600,21 +611,35 @@ final class NativeBatchExport {
         }
 
         String message = "原版长图导出：" + stats.notes + " 条成功";
+        if (stats.skipped > 0) {
+            message += "，跳过 " + stats.skipped + " 条已存在的";
+        }
         if (stats.failed > 0) {
             message += "，" + stats.failed + " 条失败";
         }
-        ProgressNotifier.finish(context, message + "\n位置：" + root, stats.notes > 0);
-        return new NoteExporter.Result(stats.notes > 0, message, root);
+        // An export where every note was already there did what it was asked to
+        // do, so it counts as a success with nothing to report but the skips.
+        boolean ok = stats.notes > 0 || stats.skipped > 0;
+        ProgressNotifier.finish(context, message + "\n位置：" + root, ok);
+        return new NoteExporter.Result(ok, message, root);
     }
 
-    private static boolean save(Context context, Note note, int index, String root,
-            Bitmap picture, NoteExporter.Stats stats, ExportOptions options) {
+    /** Where a note's picture goes: the folder and the file name. */
+    private static String[] targetOf(Note note, int index, String root, ExportOptions options) {
         String dir = options.categoryFolders
                 ? ExportSink.join(root, ExportSink.sanitize(NoteExporter.categoryOf(note)))
                 : root;
         String name = (options.numberedNames
                         ? String.format(java.util.Locale.US, "%03d_", index) : "")
                 + ExportSink.fileName(NoteExporter.titleOf(note), "无标题") + ".png";
+        return new String[] {dir, name};
+    }
+
+    private static boolean save(Context context, Note note, int index, String root,
+            Bitmap picture, NoteExporter.Stats stats, ExportOptions options) {
+        String[] target = targetOf(note, index, root, options);
+        String dir = target[0];
+        String name = target[1];
         if (options.skipExisting && ExportSink.exists(context, dir, name)) {
             Log.i(TAG, "native batch: " + name + " is already there, left alone");
             stats.skipped++;

@@ -10,6 +10,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -114,13 +115,53 @@ public final class NoteExporter {
 
     // ------------------------------------------------------------------- word
 
+    /**
+     * The notes to export, grouped as the layout needs them.
+     *
+     * <p>{@code limit} cuts the list short so a format can be tried on a couple
+     * of notes before it runs over the whole notebook. The order is the one the
+     * export itself uses, so "the first two" means the same thing whichever
+     * format is chosen; without this the Word path quietly exported everything
+     * however small a limit was asked for.
+     */
+    static Map<String, List<Note>> groupsToExport(NoteStore.Snapshot snapshot,
+            ExportOptions options) {
+        Map<String, List<Note>> groups = groupedByCategory(snapshot);
+        if (options.limit <= 0) {
+            return groups;
+        }
+        Map<String, List<Note>> limited = new LinkedHashMap<>();
+        int left = options.limit;
+        for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
+            if (left <= 0) {
+                break;
+            }
+            List<Note> notes = group.getValue();
+            int take = Math.min(left, notes.size());
+            limited.put(group.getKey(), new ArrayList<>(notes.subList(0, take)));
+            left -= take;
+        }
+        return limited;
+    }
+
+    /** How many notes those groups hold. */
+    static int countNotes(Map<String, List<Note>> groups) {
+        int count = 0;
+        for (List<Note> notes : groups.values()) {
+            count += notes.size();
+        }
+        return count;
+    }
+
     private static void exportWord(Context context, ExportOptions options,
             NoteStore.Snapshot snapshot, String root, Stats stats) throws Exception {
+        Map<String, List<Note>> groups = groupsToExport(snapshot, options);
+        stats.exported = countNotes(groups);
         if (options.wordLayout == ExportOptions.WordLayout.SINGLE) {
             Doc doc = new Doc();
             appendTitlePage(doc, snapshot, options);
 
-            for (Map.Entry<String, List<Note>> group : groupedByCategory(snapshot).entrySet()) {
+            for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
                 String category = group.getKey();
                 doc.add(heading(category, 1));
                 int index = 0;
@@ -160,7 +201,7 @@ public final class NoteExporter {
         }
 
         // One .docx per note, grouped into a directory per category.
-        for (Map.Entry<String, List<Note>> group : groupedByCategory(snapshot).entrySet()) {
+        for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
             String category = group.getKey();
             String dir = ExportSink.join(root, ExportSink.sanitize(category));
             int index = 0;
@@ -202,7 +243,8 @@ public final class NoteExporter {
 
     private static void exportImages(Context context, ExportOptions options,
             NoteStore.Snapshot snapshot, String root, Stats stats) {
-        for (Map.Entry<String, List<Note>> group : groupedByCategory(snapshot).entrySet()) {
+        for (Map.Entry<String, List<Note>> group
+                : groupsToExport(snapshot, options).entrySet()) {
             String category = group.getKey();
             String dir = ExportSink.join(root, ExportSink.sanitize(category));
             int index = 0;
