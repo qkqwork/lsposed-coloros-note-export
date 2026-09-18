@@ -723,7 +723,7 @@ final class NativeBatchExport {
             pending = null;
             return null;
         }
-        if (!triggerCapture(editor)) {
+        if (!triggerCapture(editor, preference)) {
             Log.w(TAG, "native batch: the editor's capture could not be started");
             pending = null;
             closeEditor();
@@ -1202,7 +1202,7 @@ final class NativeBatchExport {
      * directly is not an option: it is private and its first argument is built
      * by the code in between.
      */
-    private static boolean triggerCapture(Activity activity) {
+    private static boolean triggerCapture(Activity activity, ExportOptions.Background preference) {
         try {
             Object fragment = findFragment(activity);
             if (fragment == null) {
@@ -1215,6 +1215,19 @@ final class NativeBatchExport {
                 Log.w(TAG, "native batch: the editor fragment has no doPictureShare");
                 return false;
             }
+            // The second argument is the colour the share is drawn on, and the
+            // page's own JavaScript passes one; the native dialog passes null.
+            // Measured: handing it a colour changes nothing about the pages — the
+            // same pixels come back either way, because the app paints that
+            // colour behind them only in its own preview. It is passed anyway so
+            // that the app is asked the same question its own code asks, and the
+            // note's text stays whatever colour the note was rendered in.
+            Integer asked = null;
+            if (preference == ExportOptions.Background.WHITE) {
+                asked = Integer.valueOf(Color.WHITE);
+            } else if (preference == ExportOptions.Background.DARK) {
+                asked = Integer.valueOf(DARK_NOTE_BACKGROUND);
+            }
             Class<?>[] types = share.getParameterTypes();
             Object[] args = new Object[types.length];
             for (int i = 0; i < args.length; i++) {
@@ -1223,14 +1236,17 @@ final class NativeBatchExport {
                     args[i] = 0;
                 } else if (types[i] == boolean.class) {
                     args[i] = Boolean.FALSE;
+                } else if (types[i] == Integer.class) {
+                    args[i] = asked;
                 } else {
-                    // The background colour and the result callback are both
-                    // null in the app's own call.
+                    // The result callback is null in the app's own call too.
                     args[i] = null;
                 }
             }
             share.setAccessible(true);
-            Log.i(TAG, "native batch: calling doPictureShare with " + describe(types));
+            Log.i(TAG, "native batch: calling doPictureShare with " + describe(types)
+                    + " and background " + (asked == null ? "null"
+                            : "0x" + Integer.toHexString(asked)));
             share.invoke(fragment, args);
             return true;
         } catch (Throwable t) {
