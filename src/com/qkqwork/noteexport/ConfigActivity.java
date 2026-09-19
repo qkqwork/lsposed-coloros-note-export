@@ -59,6 +59,13 @@ public class ConfigActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
     private int attemptsLeft;
+    /**
+     * The count field's text while a "try one note" run is in flight.
+     *
+     * <p>The field is forced to 1 for that run and put back afterwards, so a
+     * trial never quietly rewrites the count someone typed for a real export.
+     */
+    private String limitBeforeTrial;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -341,6 +348,36 @@ public class ConfigActivity extends Activity {
         return options;
     }
 
+    /**
+     * Exports a single note so the settings can be judged before a full run.
+     *
+     * <p>Only the count differs from a normal export, and only for as long as the
+     * run lasts: {@link #startExport()} reads the screen into an
+     * {@link ExportOptions} before it returns, and the retry path re-reads it
+     * later, so the forced count has to stay in the field until the run is over.
+     */
+    private void exportOne() {
+        if (running.get() || limitBox == null) {
+            return;
+        }
+        if (limitBeforeTrial == null) {
+            limitBeforeTrial = limitBox.getText().toString();
+        }
+        limitBox.setText("1");
+        startExport();
+    }
+
+    /** Puts the count field back once a trial run has finished. */
+    private void endTrial() {
+        if (limitBeforeTrial == null) {
+            return;
+        }
+        if (limitBox != null) {
+            limitBox.setText(limitBeforeTrial);
+        }
+        limitBeforeTrial = null;
+    }
+
     private void startExport() {
         if (!running.compareAndSet(false, true)) {
             return;
@@ -423,7 +460,10 @@ public class ConfigActivity extends Activity {
     private void publish(final String message, final boolean ok) {
         handler.post(() -> {
             if (message != null) {
-                setStatus(message, !ok);
+                boolean trial = limitBeforeTrial != null;
+                endTrial();
+                setStatus(trial ? message + "\n" + getString(R.string.status_try_one_done)
+                        : message, !ok);
                 running.set(false);
                 exportButton.setEnabled(true);
                 return;
@@ -437,6 +477,7 @@ public class ConfigActivity extends Activity {
                 handler.postDelayed(() -> queryNotes(readOptions()), 3000);
                 return;
             }
+            endTrial();
             setStatus("便签未响应。请确认：\n"
                     + "1) 模块已在 LSPosed 中启用，作用域包含「便签」；\n"
                     + "2) 至少冷启动过一次便签应用；\n"
@@ -606,6 +647,10 @@ public class ConfigActivity extends Activity {
         if (exportButton != null) {
             exportButton.setOnClickListener(view -> startExport());
         }
+        View tryOne = findViewById(R.id.action_try_one);
+        if (tryOne != null) {
+            tryOne.setOnClickListener(view -> exportOne());
+        }
         View openFolder = findViewById(R.id.action_open_folder);
         if (openFolder != null) {
             openFolder.setOnClickListener(view -> openExportFolder());
@@ -663,6 +708,7 @@ public class ConfigActivity extends Activity {
         if (limitBox != null) {
             limitBox.setText("");
         }
+        limitBeforeTrial = null;
         if (watermarkText != null) {
             watermarkText.setText("");
         }

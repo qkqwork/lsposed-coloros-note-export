@@ -40,8 +40,11 @@
     <string name="watermark_text_hint">自定义文字，例如自己的昵称</string>
 
     <string name="action_export">开始导出</string>
+    <string name="action_try_one">先试 1 条</string>
     <string name="action_open_folder">打开导出目录</string>
     <string name="action_reset">恢复默认设置</string>
+    <string name="status_try_one">先试 1 条：只看第 1 条便签的效果，条数不会被记住。</string>
+    <string name="status_try_one_done">这是「先试 1 条」的结果；满意后点「开始导出」导出全部。</string>
     <string name="status_idle">准备就绪：选好格式后点「开始导出」。</string>
     <string name="status_no_file_manager">找不到能打开文件夹的应用，导出目录在：Download/便签导出</string>
 
