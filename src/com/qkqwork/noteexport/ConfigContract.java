@@ -1,4 +1,4 @@
-package com.dsh.noteexport;
+package com.qkqwork.noteexport;
 
 import android.net.Uri;
 
@@ -19,7 +19,7 @@ public final class ConfigContract {
     public static final String NOTES_PKG = "com.coloros.note";
 
     /** This module. */
-    public static final String MODULE_PKG = "com.dsh.noteexport";
+    public static final String MODULE_PKG = "com.qkqwork.noteexport";
 
     /**
      * One of the two exported providers of the Notes app that can be queried
@@ -68,7 +68,7 @@ public final class ConfigContract {
     // ------------------------------------------------------- module settings
 
     /** Read-only provider of this module, queried by the injected Notes code. */
-    public static final String SETTINGS_AUTHORITY = "com.dsh.noteexport.settings";
+    public static final String SETTINGS_AUTHORITY = "com.qkqwork.noteexport.settings";
 
     public static final Uri SETTINGS_URI =
             Uri.parse("content://" + SETTINGS_AUTHORITY + "/config");

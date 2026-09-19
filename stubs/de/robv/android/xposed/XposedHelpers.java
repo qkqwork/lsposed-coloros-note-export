@@ -20,7 +20,7 @@ package de.robv.android.xposed;
  * the module compiles against them and then loses every hook at runtime, with a
  * log line that is easy to overlook. Everything else this module needs — class
  * lookup, field access — is done with plain Java reflection instead; see
- * {@code com.dsh.noteexport.Hooks}.
+ * {@code com.qkqwork.noteexport.Hooks}.
  */
 public final class XposedHelpers {
 

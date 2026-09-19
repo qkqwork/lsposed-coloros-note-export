@@ -1,4 +1,4 @@
-package com.dsh.noteexport;
+package com.qkqwork.noteexport;
 
 /** What the user picked in the module's settings screen. */
 public final class ExportOptions {

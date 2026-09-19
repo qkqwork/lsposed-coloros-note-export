@@ -11,7 +11,7 @@ import java.lang.reflect.Member;
  * — including the plain string-based varargs one — while the module was injected
  * and running. {@code hookMethod} is the primitive every other helper is built
  * on, so the module resolves the {@link Member} itself with plain reflection and
- * hooks it here. See {@code com.dsh.noteexport.Hooks}.
+ * hooks it here. See {@code com.qkqwork.noteexport.Hooks}.
  */
 public final class XposedBridge {
 

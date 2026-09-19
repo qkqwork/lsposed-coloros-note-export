@@ -1,4 +1,4 @@
-package com.dsh.noteexport;
+package com.qkqwork.noteexport;
 
 /** One ColorOS note, as read straight out of the app's own database. */
 public final class Note {

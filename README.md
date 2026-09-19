@@ -5,6 +5,24 @@
 > 非官方项目，与 OPPO / ColorOS 无关。
 > 仅在 OnePlus PKR110 · ColorOS 16（Android 16 / API 36）· 便签 16.6.22 上验证过。
 
+## 免责声明（先读这个）
+
+- **本项目由 DeepSeek Harness（AI 编程代理）编写**；仓库 owner **qkqwork** 提供设备、提出需求并做真机验证。
+- **qkqwork 不对本项目负责**：不对代码的正确性、稳定性、安全性作任何担保，也不对使用它产生的任何后果负责
+  ——包括但不限于便签内容损坏或丢失、便签应用异常、系统不稳定、账号或服务条款风险。
+- 模块在**便签应用进程内**运行：读取它的数据库、驱动它的界面、把便签内容写到 `Download/便签导出/`。
+  请自行评估风险后再安装，**安装前务必备份**，重要内容不要只留一份。
+- 代码由 AI 生成，可能有错误或过时之处；源码全部在本仓库，欢迎自行审查后再使用。
+- 非官方项目，与 OPPO / ColorOS / OnePlus 均无关联。
+
+> This project was written by **DeepSeek Harness**, an AI coding agent. The
+> repository owner, **qkqwork**, provides the device and does the real-device
+> testing, and **takes no responsibility** for the code or for anything that
+> results from using it. It runs inside the Notes app, reads its database and
+> writes your notes out to `Download/便签导出/` — review the source and back up
+> your data before installing. Not affiliated with OPPO, ColorOS or OnePlus.
+
+
 Hook `com.coloros.note`，在**便签进程内部**批量导出全部便签：
 
 - **图片（原版长图）**：模块调用便签自己的「分享为图片」入口（`doPictureShare`），
@@ -67,7 +85,7 @@ content://com.oneplus.provider.Note/<自定义路径段>
 ## 目录
 
 ```
-src/com/dsh/noteexport/
+src/com/qkqwork/noteexport/
   Main.java                  Xposed 入口：4 个 hook
   NoteExporter.java          数据库读取 + 遍历 + 落盘编排
   Note.java                  便签数据模型
