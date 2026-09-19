@@ -159,8 +159,23 @@ io.github.qkqwork.noteexport
    里生成一个 issue，等维护者人工过。可能会被问作用域/权限/验证环境，本项目的现成答案：
    **不申请任何权限、只读便签自己的数据库、零第三方依赖（不含 AndroidX/Material）、
    在 PKR110 / Android 16 / 便签 16.6.22 上逐项真机验证过**。
-4. 通过后官方会建 `Xposed-Modules-Repo/io.github.qkqwork.noteexport`，机器人把最新 release 同步进去
-   （APK + 从清单读到的名称/描述/版本），模块就会出现在 LSPosed 管理器的模块仓库里。
+4. 通过后官方会建 `Xposed-Modules-Repo/io.github.qkqwork.noteexport`，并给你那个仓库的
+   **maintain 角色**（要先去邮件或仓库页面接受邀请）。本项目已于 2026-09-19 通过审核。
+
+### 通过之后：让模块真的出现在列表里
+
+官方仓库建好不等于收录完成，他们给的两条硬要求是：
+
+1. **那个仓库的 Description 不能留空——它就是模块在应用与网站上的显示名。**
+   去 <https://github.com/Xposed-Modules-Repo/io.github.qkqwork.noteexport>，
+   点右侧 About 的齿轮，填 `ColorOS Note Export`（与 APK 里的应用名一致），保存。
+2. **至少有一个 release。** 指的是**你自己源码仓库**里的 release（见本文第 3 步）——
+   官方那个仓库由机器人同步，不用你手动放文件。
+
+两条都满足后，通常 10 分钟内就会出现在
+[modules.lsposed.org](https://modules.lsposed.org) 的列表里，LSPosed 管理器的模块仓库里也能搜到
+（模块页地址形如 `https://modules.lsposed.org/module/io.github.qkqwork.noteexport`）。
+超过 10 分钟还没出现，就在 `Xposed-Modules-Repo` 里开 issue 问。
 
 **表单打不开 / 提交失败时的备用做法**：直接在
 <https://github.com/Xposed-Modules-Repo/submission/issues/new/choose> 选模块提交的模板，
