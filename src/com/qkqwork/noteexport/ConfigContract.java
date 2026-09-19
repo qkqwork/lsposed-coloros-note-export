@@ -129,6 +129,12 @@ public final class ConfigContract {
     public static final String COLUMN_FOLDERS = "category_folders";
     public static final String COLUMN_STAMPED = "timestamped_folder";
     public static final String COLUMN_SKIP = "skip_existing";
+    /**
+     * Export the long picture as the app's share card rather than as the bare
+     * note: 1094 px wide, with card margins and a footer carrying the watermark
+     * text. Off by default — the bare note keeps the editor's own 1264 px.
+     */
+    public static final String COLUMN_CARD_STYLE = "card_style";
     public static final String COLUMN_DEBUG = "debug_logging";
     public static final String COLUMN_WATERMARK_MODE = "watermark_mode";
     public static final String COLUMN_WATERMARK_TEXT = "watermark_text";

@@ -73,7 +73,16 @@ final class WatermarkSettings {
                         String mode = cursor.getString(modeColumn);
                         String text = textColumn >= 0 ? cursor.getString(textColumn) : "";
                         Log.i(TAG, "watermark settings from the provider: " + mode);
-                        return new WatermarkSettings(mode, text);
+                        WatermarkSettings settings = new WatermarkSettings(mode, text);
+                        // The provider answered — and this code runs inside the
+                        // Notes app, which is the one process that can write the
+                        // shared folder. So the fallback copy is brought up to
+                        // date here, where it costs nothing and cannot go stale:
+                        // the module's own process may have no row of its own to
+                        // rewrite, and a mirror left behind by an older build is
+                        // not one it can see.
+                        mirror(settings);
+                        return settings;
                     }
                 }
             } catch (Throwable t) {
@@ -91,8 +100,41 @@ final class WatermarkSettings {
         return fromFile();
     }
 
-    private static WatermarkSettings fromFile() {
-        File source = file();
+    /**
+     * Brings the fallback copy in the shared folder up to date, if it differs.
+     *
+     * <p>Best effort by design: the module's own process cannot write there at
+     * all, and inside the Notes app this is a plain file write next to the
+     * export. A failure simply leaves the previous copy, which is what the
+     * fallback is for.
+     */
+    private static void mirror(WatermarkSettings settings) {
+        File target = file();
+        try {
+            WatermarkSettings existing = fromFile();
+            if (existing.mode.equals(settings.mode) && existing.text.equals(settings.text)) {
+                return;
+            }
+            File parent = target.getParentFile();
+            if (parent != null) {
+                parent.mkdirs();
+            }
+            Properties properties = new Properties();
+            properties.setProperty(ConfigContract.COLUMN_WATERMARK_MODE, settings.mode);
+            properties.setProperty(ConfigContract.COLUMN_WATERMARK_TEXT, settings.text);
+            FileOutputStream out = new FileOutputStream(target);
+            try {
+                properties.store(out, "ColorOS note watermark");
+            } finally {
+                out.close();
+            }
+            Log.i(TAG, "watermark mirror refreshed at " + target);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not refresh the watermark mirror at " + target + ": " + t);
+        }
+    }
+
+    private static WatermarkSettings fromFile() {        File source = file();
         if (!source.isFile() || !source.canRead()) {
             Log.i(TAG, "no watermark settings anywhere, defaulting to removing it");
             return new WatermarkSettings(ConfigContract.WATERMARK_REMOVE, "");
@@ -142,7 +184,11 @@ final class WatermarkSettings {
             prefs.edit()
                     .putString(ConfigContract.COLUMN_WATERMARK_MODE, safeMode)
                     .putString(ConfigContract.COLUMN_WATERMARK_TEXT, safeText)
-                    .apply();
+                    // Committed, like the rest of the settings: the Notes process
+                    // reads these back through the provider, and a write that was
+                    // still queued when the app was killed would hand it the old
+                    // watermark.
+                    .commit();
             if (unchanged) {
                 // The screen saves after every tap, and this mirror is a file in
                 // the user's Downloads folder: it is only worth writing when the

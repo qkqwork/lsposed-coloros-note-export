@@ -159,6 +159,19 @@
             android:text="@string/option_skip" />
 
         <CheckBox
+            android:id="@+id/option_card"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_card" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_card_note" />
+
+        <CheckBox
             android:id="@+id/option_debug"
             style="@style/NoteExport.Option"
             android:layout_width="match_parent"

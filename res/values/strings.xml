@@ -23,6 +23,8 @@
     <string name="option_stamped">每次导出放到新的时间戳文件夹</string>
     <string name="option_skip">跳过已存在的文件（配合上面取消勾选，可接着上次继续导出）</string>
     <string name="option_debug">开启调试日志（详细诊断，导出很多次都不用开）</string>
+    <string name="option_card">导出便签式卡片版（宽 1094 px，带卡面边距与底部一行）</string>
+    <string name="option_card_note">默认关闭时导出的是干净的原版长图：编辑器原始 1264 px 宽、无卡面边距、无底部那一行。打开后改成像便签「分享为图片」那样的卡片：宽度 1094 px、四周卡面边距，底部按「分享长图的水印」这一项画一条分割线加你的文字（选「去掉」或「不动它」就不画，「留白」留一条空白）。卡片由模块合成，字体与间距是仿的，不会和便签自己分享的那张逐像素一致。</string>
     <string name="option_debug_note">调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，只在排查问题时勾选。</string>
 
     <string name="section_background">长图底色</string>

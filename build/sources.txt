@@ -15,6 +15,7 @@ D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Main.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NativeBatchExport.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NativeImageExport.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Note.java
+D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteCard.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteExporter.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteHtml.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteSelection.java

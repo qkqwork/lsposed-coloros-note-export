@@ -87,6 +87,17 @@ public final class ExportOptions {
     public boolean skipExisting;
 
     /**
+     * Draw the long picture as a share card instead of as the bare note.
+     *
+     * <p>Off is the plain export: the editor's own pages at their own 1264 px,
+     * with nothing added. On adds what the app adds when it shares a note as a
+     * picture — a narrower card with margins and a footer — and that footer is
+     * where the watermark setting finally reaches an export, because the app's
+     * own watermark lives in the card this module does not otherwise build.
+     */
+    public boolean cardStyle;
+
+    /**
      * Install the diagnostic probes and log their detail.
      *
      * <p>Off by default: they hook whole families of the app's methods and print

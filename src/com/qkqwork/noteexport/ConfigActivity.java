@@ -14,9 +14,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
-import android.text.Editable;
 import android.text.TextUtils;
-import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.CheckBox;
@@ -72,6 +70,8 @@ public class ConfigActivity extends Activity {
     private CheckBox stampedBox;
     private CheckBox skipBox;
     private CheckBox debugBox;
+    /** Whether the long picture is drawn as the app's share card. */
+    private CheckBox cardBox;
     /**
      * States which background the long pictures will get.
      *
@@ -165,6 +165,7 @@ public class ConfigActivity extends Activity {
         stampedBox = findViewById(R.id.option_stamped);
         skipBox = findViewById(R.id.option_skip);
         debugBox = findViewById(R.id.option_debug);
+        cardBox = findViewById(R.id.option_card);
         backgroundValue = findViewById(R.id.background_value);
         watermarkGroup = findViewById(R.id.watermark_group);
         watermarkText = findViewById(R.id.watermark_text);
@@ -192,25 +193,24 @@ public class ConfigActivity extends Activity {
         }
         CompoundButton.OnCheckedChangeListener saver = (button, checked) -> saveOptions();
         for (CheckBox box : new CheckBox[]{recycledBox, numberedBox, foldersBox,
-                stampedBox, skipBox, debugBox}) {
+                stampedBox, skipBox, cardBox, debugBox}) {
             if (box != null) {
                 box.setOnCheckedChangeListener(saver);
             }
         }
         if (limitBox != null) {
-            limitBox.addTextChangedListener(new TextWatcher() {
-                @Override
-                public void beforeTextChanged(CharSequence text, int start, int count, int after) {
-                    // nothing to do before the text changes
+            // Saved when the field is left rather than on every keystroke: the
+            // write is a synchronous one (see saveOptions) and a half typed
+            // number is not worth committing at all.
+            limitBox.setOnFocusChangeListener((view, focused) -> {
+                if (!focused) {
+                    saveOptions();
                 }
-
-                @Override
-                public void onTextChanged(CharSequence text, int start, int before, int count) {
-                    // and nothing to do while it is changing
-                }
-
-                @Override
-                public void afterTextChanged(Editable text) {
+            });
+        }
+        if (watermarkText != null) {
+            watermarkText.setOnFocusChangeListener((view, focused) -> {
+                if (!focused) {
                     saveOptions();
                 }
             });
@@ -693,6 +693,7 @@ public class ConfigActivity extends Activity {
         options.categoryFolders = foldersBox == null || foldersBox.isChecked();
         options.skipExisting = skipBox != null && skipBox.isChecked();
         options.debug = debugBox != null && debugBox.isChecked();
+        options.cardStyle = cardBox != null && cardBox.isChecked();
         // The picker's tick list, which an empty list turns back into "everything".
         options.guids.addAll(NoteSelection.read(this));
         options.limit = 0;
@@ -727,6 +728,7 @@ public class ConfigActivity extends Activity {
             check(stampedBox, prefs.getBoolean(ConfigContract.COLUMN_STAMPED, true));
             check(skipBox, prefs.getBoolean(ConfigContract.COLUMN_SKIP, false));
             check(debugBox, prefs.getBoolean(ConfigContract.COLUMN_DEBUG, false));
+            check(cardBox, prefs.getBoolean(ConfigContract.COLUMN_CARD_STYLE, false));
             if (limitBox != null) {
                 limitBox.setText(prefs.getString(ConfigContract.COLUMN_LIMIT, ""));
             }
@@ -775,9 +777,14 @@ public class ConfigActivity extends Activity {
                 .putBoolean(ConfigContract.COLUMN_STAMPED, options.timestampedFolder)
                 .putBoolean(ConfigContract.COLUMN_SKIP, options.skipExisting)
                 .putBoolean(ConfigContract.COLUMN_DEBUG, options.debug)
+                .putBoolean(ConfigContract.COLUMN_CARD_STYLE, options.cardStyle)
                 .putString(ConfigContract.COLUMN_LIMIT,
                         limitBox == null ? "" : limitBox.getText().toString().trim())
-                .apply();
+                // Committed rather than applied: an option is written the moment
+                // it is chosen, and a queued write dies with a process that is
+                // killed before it flushes — which is exactly how a choice made
+                // on this screen was once lost.
+                .commit();
         // The watermark travels to the Notes process through the provider and a
         // mirrored file, so both are written here, where the user just decided.
         WatermarkSettings.save(this, watermarkModeOf(),
@@ -803,6 +810,7 @@ public class ConfigActivity extends Activity {
             check(stampedBox, true);
             check(skipBox, false);
             check(debugBox, false);
+            check(cardBox, false);
             if (limitBox != null) {
                 limitBox.setText("");
             }
@@ -868,6 +876,10 @@ public class ConfigActivity extends Activity {
         if (!running.compareAndSet(false, true)) {
             return;
         }
+        // Everything the form says is written before it travels: a watermark
+        // text typed and then exported straight away would otherwise leave with
+        // the value from the last time something else was tapped.
+        saveOptions();
         ExportOptions options = readOptions();
         // The options travel in the query itself. Writing them to a file in
         // Downloads used to look simpler, but this module holds no storage

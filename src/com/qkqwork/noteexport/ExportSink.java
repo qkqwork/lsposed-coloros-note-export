@@ -13,6 +13,8 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Where an export lands.
@@ -137,24 +139,101 @@ public final class ExportSink {
      *
      * <p>MediaStore renames a new row when the name it is handed is taken, which
      * is how the settings mirror ended up beside the pictures as
-     * {@code note_watermark (1).txt}, {@code (2)} and so on, one per export.
-     * Writing over the row that is already there keeps the folder to one file.
+     * {@code note_watermark (1).txt}, {@code (2)} and so on. The row that is
+     * already there is rewritten instead — and when the copies cannot be
+     * matched to a row at all (an older build wrote the mirror as a plain file,
+     * so no row exists for it), the copies are cleared away and one file with
+     * the intended name is written, so the folder converges on a single mirror
+     * instead of growing one per save.
      */
     public static ExportSink replace(Context context, String relativeDir, String name,
             String mimeType) throws Exception {
-        Uri existing = find(context, relativeDir, name);
-        if (existing != null) {
-            ExportSink sink = new ExportSink(context);
-            OutputStream out = sink.resolver.openOutputStream(existing, "wt");
-            if (out != null) {
-                sink.uri = existing;
-                sink.stream = out;
-                sink.displayPath = join(relativeDirectory(relativeDir), name);
+        Uri exact = find(context, relativeDir, name);
+        if (exact != null) {
+            ExportSink sink = rewrite(context, relativeDir, name, exact);
+            if (sink != null) {
                 return sink;
             }
-            Log.w(TAG, "could not rewrite " + existing + ", adding a new file instead");
+        }
+        // Anything that looks like the same file under a deduplicated name.
+        List<Uri> copies = findCopies(context, relativeDir, name);
+        for (Uri copy : copies) {
+            ExportSink sink = rewrite(context, relativeDir, name, copy);
+            if (sink != null) {
+                for (Uri other : copies) {
+                    if (!other.equals(copy)) {
+                        deleteQuietly(context, other);
+                    }
+                }
+                Log.i(TAG, "rewrote " + copy + " as " + name);
+                return sink;
+            }
         }
         return open(context, relativeDir, name, mimeType);
+    }
+
+    /** Opens that row for writing, or null when it cannot be written. */
+    private static ExportSink rewrite(Context context, String relativeDir, String name, Uri row) {
+        try {
+            ExportSink sink = new ExportSink(context);
+            OutputStream out = sink.resolver.openOutputStream(row, "wt");
+            if (out == null) {
+                return null;
+            }
+            sink.uri = row;
+            sink.stream = out;
+            sink.displayPath = join(relativeDirectory(relativeDir), name);
+            return sink;
+        } catch (Throwable t) {
+            Log.w(TAG, "could not rewrite " + row + ": " + t);
+            return null;
+        }
+    }
+
+    /** Rows whose name is that one plus MediaStore's " (n)" suffix. */
+    private static List<Uri> findCopies(Context context, String relativeDir, String name) {
+        List<Uri> found = new ArrayList<>();
+        try {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                return found;
+            }
+            String base = name;
+            int dot = name.lastIndexOf('.');
+            String stem = dot > 0 ? name.substring(0, dot) : name;
+            String extension = dot > 0 ? name.substring(dot) : "";
+            String[] projection = {MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME};
+            String where = MediaStore.Downloads.DISPLAY_NAME + " LIKE ? AND "
+                    + MediaStore.Downloads.RELATIVE_PATH + "=?";
+            Cursor cursor = context.getContentResolver().query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI, projection, where,
+                    new String[] {stem + " (%" + extension, relativeDirectory(relativeDir) + "/"},
+                    null);
+            if (cursor != null) {
+                try {
+                    while (cursor.moveToNext()) {
+                        String display = cursor.getString(1);
+                        if (display == null || display.equals(base)) {
+                            continue;
+                        }
+                        found.add(android.content.ContentUris.withAppendedId(
+                                MediaStore.Downloads.EXTERNAL_CONTENT_URI, cursor.getLong(0)));
+                    }
+                } finally {
+                    cursor.close();
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not look for copies of " + name + ": " + t);
+        }
+        return found;
+    }
+
+    private static void deleteQuietly(Context context, Uri row) {
+        try {
+            context.getContentResolver().delete(row, null, null);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not remove " + row + ": " + t);
+        }
     }
 
     /** The relative path (below Downloads) a directory argument stands for. */

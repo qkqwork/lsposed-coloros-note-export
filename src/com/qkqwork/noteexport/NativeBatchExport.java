@@ -578,7 +578,7 @@ final class NativeBatchExport {
                     break;
                 }
             }
-            Bitmap picture = captureOne(context, list, note, options.background);
+            Bitmap picture = captureOne(context, list, note, options);
             if (picture == null) {
                 // A capture that timed out once usually works when it is asked
                 // again from a clean editor, so a note is retried before it is
@@ -586,7 +586,7 @@ final class NativeBatchExport {
                 Log.i(TAG, "native batch: trying " + note.id + " once more");
                 list = openNoteList(context);
                 if (list != null) {
-                    picture = captureOne(context, list, note, options.background);
+                    picture = captureOne(context, list, note, options);
                 }
             }
             if (picture == null) {
@@ -740,7 +740,7 @@ final class NativeBatchExport {
 
     /** Clicks the note in the list, waits for the editor, and asks it to capture. */
     private static Bitmap captureOne(Context context, Activity list, Note note,
-            ExportOptions.Background preference) {
+            ExportOptions options) {
         View item = findListItem(list, note);
         if (item == null) {
             // The list shows one folder at a time, so a note from another folder
@@ -771,7 +771,7 @@ final class NativeBatchExport {
             pending = null;
             return null;
         }
-        if (!triggerCapture(editor, preference)) {
+        if (!triggerCapture(editor, options.background)) {
             Log.w(TAG, "native batch: the editor's capture could not be started");
             pending = null;
             closeEditor();
@@ -820,12 +820,22 @@ final class NativeBatchExport {
             return null;
         }
         boolean[] lightText = new boolean[1];
-        int background = backgroundFor(captured, preference, lightText);
+        int background = backgroundFor(captured, options.background, lightText);
         Bitmap painted = combined(background);
         if (painted != null) {
             painted = contrastText(painted, lightText[0], background);
             int stopAbove = painted.getHeight() - Math.max(0, lastPageHeight);
             painted = trimmed(painted, background, stopAbove);
+            if (options.cardStyle) {
+                // The card is drawn last, around the note as it will be saved, so
+                // the footer sits under the trimmed picture rather than under
+                // blank rows that were cut away.
+                Bitmap carded = NoteCard.apply(context, painted, background);
+                if (carded != null && carded != painted) {
+                    painted.recycle();
+                    painted = carded;
+                }
+            }
         }
         pending = null;
         merged = null;

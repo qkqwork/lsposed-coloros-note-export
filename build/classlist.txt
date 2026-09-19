@@ -122,6 +122,7 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NativeI
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NativeImageExport$5.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NativeImageExport.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\Note.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteCard.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteExporter$Result.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteExporter$Stats.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteExporter.class
