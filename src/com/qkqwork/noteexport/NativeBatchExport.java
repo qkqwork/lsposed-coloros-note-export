@@ -553,6 +553,10 @@ final class NativeBatchExport {
         int failuresInARow = 0;
         byte[] preview = null;
         for (int i = 0; i < limit; i++) {
+            if (Progress.cancelled()) {
+                Log.i(TAG, "native batch: stopping, cancellation asked for after " + i);
+                break;
+            }
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
             ProgressNotifier.progress(context, i, limit, NoteExporter.titleOf(note));

@@ -21,6 +21,7 @@ D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteSelection.jav
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteStore.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\PickerActivity.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\PipelineProbe.java
+D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Progress.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ProgressNotifier.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ShareProbe.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Thumbnail.java

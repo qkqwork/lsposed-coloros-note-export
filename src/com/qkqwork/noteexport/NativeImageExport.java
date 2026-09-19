@@ -200,7 +200,12 @@ final class NativeImageExport {
         int index = 0;
         byte[] preview = null;
         for (Note note : notes) {
+            if (Progress.cancelled()) {
+                Log.i(TAG, "native: stopping, cancellation asked for after " + index);
+                break;
+            }
             index++;
+            Progress.step(index, NoteExporter.titleOf(note));
             String category = NoteExporter.categoryOf(note);
             String dir = ExportSink.join(root, ExportSink.sanitize(category));
             String base = String.format(java.util.Locale.US, "%03d_", index)

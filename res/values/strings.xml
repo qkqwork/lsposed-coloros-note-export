@@ -40,6 +40,10 @@
     <string name="watermark_text_hint">自定义文字，例如自己的昵称</string>
 
     <string name="action_export">开始导出</string>
+    <string name="action_cancel">取消导出</string>
+    <string name="action_cancel_asked">已请求取消：正在画的那一条会画完，之后就停。</string>
+    <string name="status_progress">正在导出 %1$d / %2$d：%3$s</string>
+    <string name="status_progress_unknown">正在导出…（便签还没回报进度）</string>
     <string name="action_try_one">先试 1 条</string>
     <string name="action_open_folder">打开导出目录</string>
     <string name="action_reset">恢复默认设置</string>

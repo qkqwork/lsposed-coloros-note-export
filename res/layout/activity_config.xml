@@ -318,6 +318,23 @@
                 android:text="@string/action_reset" />
         </LinearLayout>
 
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/inner_top_margin"
+            android:max="100"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/action_cancel"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:text="@string/action_cancel"
+            android:visibility="gone" />
+
         <TextView
             style="@style/NoteExport.Section"
             android:layout_width="match_parent"

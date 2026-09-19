@@ -173,6 +173,50 @@ public class Main implements IXposedHookLoadPackage {
         return cursor;
     }
 
+    /**
+     * How far the export has got, for the settings screen to draw a bar with.
+     *
+     * <p>Answered from the Notes process's own memory: the screen runs in the
+     * module's process and cannot see the export any other way. Same caller check
+     * as everything else — a note title rides along here.
+     */
+    private static Cursor progressCursor(Context context) {
+        MatrixCursor cursor = new MatrixCursor(ConfigContract.PROGRESS_COLUMNS);
+        if (context == null) {
+            return cursor;
+        }
+        if (!callerAllowed(context)) {
+            return cursor;
+        }
+        cursor.addRow(new Object[] {
+                Progress.running() ? 1 : 0,
+                Progress.done(),
+                Progress.total(),
+                Progress.title(),
+                Progress.cancelled() ? 1 : 0});
+        return cursor;
+    }
+
+    /** Asks the running export to stop at the next note. */
+    private static Cursor cancelCursor(Context context) {
+        MatrixCursor cursor = new MatrixCursor(ConfigContract.PROGRESS_COLUMNS);
+        if (context == null) {
+            return cursor;
+        }
+        if (!callerAllowed(context)) {
+            Log.w(TAG, "refusing a cancel request from uid " + Binder.getCallingUid());
+            return cursor;
+        }
+        Progress.cancel();
+        cursor.addRow(new Object[] {
+                Progress.running() ? 1 : 0,
+                Progress.done(),
+                Progress.total(),
+                Progress.title(),
+                Progress.cancelled() ? 1 : 0});
+        return cursor;
+    }
+
     private void hookExportTrigger(XC_LoadPackage.LoadPackageParam param) {
         boolean hooked = false;
         for (String className : PROVIDER_CLASSES) {
@@ -201,6 +245,18 @@ public class Main implements IXposedHookLoadPackage {
                                 Context context = ((ContentProvider) method.thisObject)
                                         .getContext();
                                 method.setResult(runDiagnostics(context));
+                                return;
+                            }
+                            if (ConfigContract.PROGRESS_SEGMENT.equals(segment)) {
+                                Context context = ((ContentProvider) method.thisObject)
+                                        .getContext();
+                                method.setResult(progressCursor(context));
+                                return;
+                            }
+                            if (ConfigContract.CANCEL_SEGMENT.equals(segment)) {
+                                Context context = ((ContentProvider) method.thisObject)
+                                        .getContext();
+                                method.setResult(cancelCursor(context));
                                 return;
                             }
                             if (!ConfigContract.EXPORT_SEGMENT.equals(segment)) {
@@ -310,9 +366,7 @@ public class Main implements IXposedHookLoadPackage {
 
     private static MatrixCursor answer(boolean ok, String message, String path) {
         return answer(ok, message, path, null);
-    }
-
-    private static MatrixCursor answer(boolean ok, String message, String path,
+    }    private static MatrixCursor answer(boolean ok, String message, String path,
             byte[] thumbnail) {
         MatrixCursor cursor = new MatrixCursor(ConfigContract.EXPORT_COLUMNS);
         cursor.addRow(new Object[] {ok ? 1 : 0, message, path, thumbnail});

@@ -63,6 +63,21 @@ public final class ConfigContract {
      */
     public static final String DIAG_SEGMENT = "note_dsh_diag";
 
+    /** How far the export running in the Notes process has got. */
+    public static final String PROGRESS_SEGMENT = "note_dsh_progress";
+
+    /** Asks that export to stop at the next note. */
+    public static final String CANCEL_SEGMENT = "note_dsh_cancel";
+
+    /**
+     * Columns of the progress answer.
+     *
+     * <p>{@code cancel} says whether a stop has been asked for, so the screen can
+     * show that the request is in and the current note is still being drawn.
+     */
+    public static final String[] PROGRESS_COLUMNS =
+            {"running", "done", "total", "title", "cancel"};
+
     /**
      * Columns of the {@link android.database.MatrixCursor} returned by a query.
      *
@@ -86,6 +101,14 @@ public final class ConfigContract {
 
     public static Uri diagUri(String authority) {
         return Uri.parse("content://" + authority + "/" + DIAG_SEGMENT);
+    }
+
+    public static Uri progressUri(String authority) {
+        return Uri.parse("content://" + authority + "/" + PROGRESS_SEGMENT);
+    }
+
+    public static Uri cancelUri(String authority) {
+        return Uri.parse("content://" + authority + "/" + CANCEL_SEGMENT);
     }
 
     // ------------------------------------------------------- module settings

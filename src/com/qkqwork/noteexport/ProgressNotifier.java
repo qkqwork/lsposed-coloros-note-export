@@ -39,6 +39,8 @@ final class ProgressNotifier {
 
     static void progress(Context context, int done, int total, String title) {
         String text = done + " / " + total + (title == null || title.isEmpty() ? "" : "：" + title);
+        // The settings screen watches the same numbers through the provider.
+        Progress.step(done, title);
         post(context, "正在导出便签长图", text, false, -1, done, total);
     }
 

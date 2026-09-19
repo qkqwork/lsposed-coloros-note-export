@@ -107,20 +107,27 @@ public final class NoteExporter {
         // reproduce faithfully in a preview.
         byte[] thumbnail = null;
 
-        if (options.format == ExportOptions.Format.WORD) {
-            exportWord(context, options, snapshot, root, stats);
-        } else if (options.format == ExportOptions.Format.NATIVE) {
-            // The app renders each note itself; see NativeImageExport.
-            Result result = NativeImageExport.export(context, snapshot, options, root, stats);
-            writeReadme(context, root, options, stats);
-            return result;
-        } else if (options.format == ExportOptions.Format.NATIVE_BATCH) {
-            // Experimental: drive the app's own editor and keep what it draws.
-            Result result = NativeBatchExport.export(context, snapshot, options, root, stats);
-            writeReadme(context, root, options, stats);
-            return result;
-        } else {
-            thumbnail = exportImages(context, options, snapshot, root, stats);
+        // Counted the same way the export itself picks its notes, so the bar the
+        // screen draws matches the work that is about to happen.
+        Progress.start(countNotes(groupsToExport(snapshot, options)));
+        try {
+            if (options.format == ExportOptions.Format.WORD) {
+                exportWord(context, options, snapshot, root, stats);
+            } else if (options.format == ExportOptions.Format.NATIVE) {
+                // The app renders each note itself; see NativeImageExport.
+                Result result = NativeImageExport.export(context, snapshot, options, root, stats);
+                writeReadme(context, root, options, stats);
+                return withCancellation(result, stats);
+            } else if (options.format == ExportOptions.Format.NATIVE_BATCH) {
+                // Experimental: drive the app's own editor and keep what it draws.
+                Result result = NativeBatchExport.export(context, snapshot, options, root, stats);
+                writeReadme(context, root, options, stats);
+                return withCancellation(result, stats);
+            } else {
+                thumbnail = exportImages(context, options, snapshot, root, stats);
+            }
+        } finally {
+            Progress.finish();
         }
 
         writeReadme(context, root, options, stats);
@@ -129,7 +136,23 @@ public final class NoteExporter {
             summary += "（跳过 " + stats.encrypted + " 条加密便签）";
         }
         Log.i(TAG, summary);
-        return new Result(true, summary, root, thumbnail);
+        return withCancellation(new Result(true, summary, root, thumbnail), stats);
+    }
+
+    /**
+     * Says so when a run ended because it was asked to stop.
+     *
+     * <p>The export loops leave early on a cancel, and the result they build on
+     * the way out cannot know that: everything they counted is still true, the
+     * list simply was not finished.
+     */
+    private static Result withCancellation(Result result, Stats stats) {
+        if (!Progress.wasCancelled()) {
+            return result;
+        }
+        return new Result(result.ok,
+                result.message + "（已取消：已导出 " + stats.notes + " 条，其余未处理）",
+                result.path, result.thumbnail);
     }
 
     // ------------------------------------------------------------------- word
@@ -229,7 +252,11 @@ public final class NoteExporter {
                 doc.add(heading(category, 1));
                 int index = 0;
                 for (Note note : group.getValue()) {
+                    if (Progress.cancelled()) {
+                        break;
+                    }
                     index++;
+                    Progress.step(stats.notes, titleOf(note));
                     // A per-note heading makes the category's contents visible in
                     // Word's navigation pane and keeps Ctrl+F usable.
                     doc.add(heading(prefix(index) + titleOf(note), 2));
@@ -265,11 +292,18 @@ public final class NoteExporter {
 
         // One .docx per note, grouped into a directory per category.
         for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
+            if (Progress.cancelled()) {
+                break;
+            }
             String category = group.getKey();
             String dir = ExportSink.join(root, ExportSink.sanitize(category));
             int index = 0;
             for (Note note : group.getValue()) {
+                if (Progress.cancelled()) {
+                    break;
+                }
                 index++;
+                Progress.step(stats.notes, titleOf(note));
                 String base = prefix(index) + ExportSink.fileName(titleOf(note), UNTITLED);
                 Doc doc = new Doc();
                 doc.add(heading(titleOf(note), 1));
@@ -314,11 +348,18 @@ public final class NoteExporter {
         byte[] preview = null;
         for (Map.Entry<String, List<Note>> group
                 : groupsToExport(snapshot, options).entrySet()) {
+            if (Progress.cancelled()) {
+                break;
+            }
             String category = group.getKey();
             String dir = ExportSink.join(root, ExportSink.sanitize(category));
             int index = 0;
             for (Note note : group.getValue()) {
+                if (Progress.cancelled()) {
+                    break;
+                }
                 index++;
+                Progress.step(stats.notes, titleOf(note));
                 String base = prefix(index) + ExportSink.fileName(titleOf(note), UNTITLED);
                 String name = truncate(base, MAX_NAME - 5) + ".png";
                 ExportSink sink = null;

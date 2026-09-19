@@ -50,6 +50,9 @@ Hook `com.coloros.note`，在**便签进程内部**批量导出全部便签：
   浅色主题下直接把白纸黑字画进图里），模块跟着同一套配色补底色，**不重绘任何像素**。
   设置页会把当前主题对应的结果写出来；想换底色，改系统深色模式即可
 - **打开导出目录 / 恢复默认设置**：前者直接跳到 `Download/便签导出/`，后者一键回到推荐选项
+- **导出进度条 + 取消导出**：导出跑在便签进程里，模块自己的进程看不到，所以便签那一侧把进度
+  （第几条 / 共几条 / 正在画哪一条）与"是否请求取消"放在它自己的内存里，设置页每 0.7 秒问一次
+  并画进度条；「取消导出」是请求而不是硬停——正在画的那一条会画完，从下一条起不再处理
 - **选项即改即存**：任何一处改动立刻写入，任务被划掉或进程被杀也不会丢
 
 产物落在 `Download/便签导出/<时间戳>/` 下，**不需要任何存储权限**。
@@ -98,8 +101,10 @@ content://com.oneplus.provider.Note/<自定义路径段>
 src/com/qkqwork/noteexport/
   Main.java                  Xposed 入口：provider 拦截（导出 / 探针 / 诊断 / 便签清单）+ 兜底链路
   Hooks.java                 反射式 findAndHookMethod（绕开 legacy API 的签名坑）
-  ConfigActivity.java        设置页（XML 布局 + 资源，选项即改即存）
+  ConfigActivity.java        设置页（XML 布局 + 资源，选项即改即存、进度条、预览）
   PickerActivity.java        便签选择器（向便签应用要清单，勾选后只导出这些）
+  Progress.java              导出进度与取消请求（便签进程里的状态，设置页轮询它）
+  Thumbnail.java             导出结果顶部的小预览图（骑着回答的 cursor 回传）
   ExportOptions.java         导出选项（格式 / 组织方式 / 底色 / 便签子集 / 限制条数…）
   ExportRequest.java         选项在进程间的载体（查询串，附带落盘兜底）
   ConfigProvider.java        模块自己的只读设置 provider
@@ -114,7 +119,6 @@ src/com/qkqwork/noteexport/
   HtmlToWord.java            HTML → WordprocessingML 转换器
   DocxWriter.java            .docx 打包（含图片内嵌）
   NoteHtml.java              便签 raw_text 的整理
-  Thumbnail.java             导出结果顶部的小预览图（骑着回答的 cursor 回传）
   ExportSink.java            落盘（MediaStore，免存储权限；同名覆写）
   ProgressNotifier.java      便签应用自己的通知栏进度
   WatermarkHook.java         分享长图水印的四种处理

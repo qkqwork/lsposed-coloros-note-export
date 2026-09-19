@@ -25,6 +25,7 @@ import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.RadioGroup;
 import android.widget.TextView;
 
@@ -58,6 +59,8 @@ public class ConfigActivity extends Activity {
             "content://com.android.externalstorage.documents/root/primary";
     private static final String DIRECTORY_MIME = "vnd.android.document/directory";
     private static final String ROOT_MIME = "vnd.android.document/root";
+    /** How often the screen asks the Notes process how far along it is. */
+    private static final long PROGRESS_POLL_MS = 700;
 
     private RadioGroup formatGroup;
     private RadioGroup layoutGroup;
@@ -86,6 +89,20 @@ public class ConfigActivity extends Activity {
     private ImageView previewView;
     /** How many notes the picker has ticked; none means all of them. */
     private TextView selectedNotesView;
+    /** Shown only while an export is in flight. */
+    private ProgressBar progressBar;
+    private Button cancelButton;
+    /** Polls the Notes process for progress while an export runs. */
+    private final Runnable progressPoll = new Runnable() {
+        @Override
+        public void run() {
+            if (!running.get()) {
+                return;
+            }
+            refreshProgress();
+            handler.postDelayed(this, PROGRESS_POLL_MS);
+        }
+    };
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -153,6 +170,8 @@ public class ConfigActivity extends Activity {
         statusView = findViewById(R.id.status);
         previewView = findViewById(R.id.preview);
         selectedNotesView = findViewById(R.id.selected_notes);
+        progressBar = findViewById(R.id.progress);
+        cancelButton = findViewById(R.id.action_cancel);
 
         if (formatGroup != null) {
             formatGroup.setOnCheckedChangeListener((group, checked) -> {
@@ -212,6 +231,143 @@ public class ConfigActivity extends Activity {
         View pickNotes = findViewById(R.id.action_pick_notes);
         if (pickNotes != null) {
             pickNotes.setOnClickListener(view -> pickNotes());
+        }
+        if (cancelButton != null) {
+            cancelButton.setOnClickListener(view -> cancelExport());
+        }
+    }
+
+    // -------------------------------------------------------------- the progress
+
+    /**
+     * Asks the Notes process how far along it is and draws the bar.
+     *
+     * <p>The work happens in another process, so there is nothing to observe
+     * locally: the export publishes its own state and this asks for it. The call
+     * is a binder query, so it goes out on its own thread and the answer comes
+     * back to the main thread.
+     */
+    private void refreshProgress() {
+        new Thread(() -> {
+            int done = -1;
+            int total = 0;
+            String title = "";
+            boolean cancelAsked = false;
+            for (String authority : ConfigContract.NOTES_AUTHORITIES) {
+                Cursor cursor = null;
+                try {
+                    cursor = getContentResolver().query(
+                            ConfigContract.progressUri(authority), null, null, null, null);
+                    if (cursor == null || !cursor.moveToFirst()) {
+                        continue;
+                    }
+                    done = intAt(cursor, "done", -1);
+                    total = intAt(cursor, "total", 0);
+                    title = stringAt(cursor, "title", "");
+                    cancelAsked = intAt(cursor, "cancel", 0) != 0;
+                    break;
+                } catch (Throwable t) {
+                    Log.w(TAG, "progress query to " + authority + " failed: " + t);
+                } finally {
+                    closeQuietly(cursor);
+                }
+            }
+            final int doneNow = done;
+            final int totalNow = total;
+            final String titleNow = title;
+            final boolean askedNow = cancelAsked;
+            handler.post(() -> showProgress(doneNow, totalNow, titleNow, askedNow));
+        }, "note-export-progress").start();
+    }
+
+    private void showProgress(int done, int total, String title, boolean cancelAsked) {
+        if (progressBar == null) {
+            return;
+        }
+        if (total > 0 && done >= 0) {
+            progressBar.setIndeterminate(false);
+            progressBar.setMax(total);
+            progressBar.setProgress(Math.min(done, total));
+            setStatus(getString(R.string.status_progress, done, total,
+                    TextUtils.isEmpty(title) ? "" : title), false);
+        } else {
+            // The Notes process answers even before its first note is done.
+            progressBar.setIndeterminate(true);
+        }
+        if (cancelAsked) {
+            setStatus(getString(R.string.action_cancel_asked), false);
+            if (cancelButton != null) {
+                cancelButton.setEnabled(false);
+            }
+        }
+    }
+
+    /** Asks the export running in the Notes process to stop. */
+    private void cancelExport() {
+        if (!running.get()) {
+            return;
+        }
+        if (cancelButton != null) {
+            cancelButton.setEnabled(false);
+        }
+        setStatus(getString(R.string.action_cancel_asked), false);
+        new Thread(() -> {
+            for (String authority : ConfigContract.NOTES_AUTHORITIES) {
+                Cursor cursor = null;
+                try {
+                    cursor = getContentResolver().query(
+                            ConfigContract.cancelUri(authority), null, null, null, null);
+                    if (cursor != null) {
+                        Log.i(TAG, "cancellation asked for through " + authority);
+                        break;
+                    }
+                } catch (Throwable t) {
+                    Log.w(TAG, "cancel query to " + authority + " failed: " + t);
+                } finally {
+                    closeQuietly(cursor);
+                }
+            }
+        }, "note-export-cancel").start();
+    }
+
+    private void setExporting(boolean exporting) {
+        if (progressBar != null) {
+            progressBar.setVisibility(exporting ? View.VISIBLE : View.GONE);
+            if (exporting) {
+                progressBar.setIndeterminate(true);
+                progressBar.setProgress(0);
+            }
+        }
+        if (cancelButton != null) {
+            cancelButton.setVisibility(exporting ? View.VISIBLE : View.GONE);
+            cancelButton.setEnabled(exporting);
+        }
+        if (exportButton != null) {
+            exportButton.setEnabled(!exporting);
+        }
+    }
+
+    private static int intAt(Cursor cursor, String column, int fallback) {
+        int index = cursor.getColumnIndex(column);
+        return index < 0 || cursor.isNull(index) ? fallback : cursor.getInt(index);
+    }
+
+    private static String stringAt(Cursor cursor, String column, String fallback) {
+        int index = cursor.getColumnIndex(column);
+        if (index < 0) {
+            return fallback;
+        }
+        String value = cursor.getString(index);
+        return value == null ? fallback : value;
+    }
+
+    private static void closeQuietly(Cursor cursor) {
+        if (cursor != null) {
+            try {
+                cursor.close();
+            } catch (Throwable ignored) {
+                // nothing useful to do
+            }
         }
     }
 
@@ -710,7 +866,7 @@ public class ConfigActivity extends Activity {
         ExportRequest.write(options);
 
         setStatus(getString(R.string.status_asking), false);
-        exportButton.setEnabled(false);
+        setExporting(true);
         attemptsLeft = 2;
 
         if (options.format == ExportOptions.Format.NATIVE
@@ -720,9 +876,13 @@ public class ConfigActivity extends Activity {
             // up first and asked a moment later.
             setStatus(getString(R.string.status_opening_notes), false);
             openNotesApp();
+            handler.removeCallbacks(progressPoll);
+            handler.post(progressPoll);
             handler.postDelayed(() -> queryNotes(options), 3000);
             return;
         }
+        handler.removeCallbacks(progressPoll);
+        handler.post(progressPoll);
         queryNotes(options);
     }
 
@@ -791,8 +951,7 @@ public class ConfigActivity extends Activity {
                 endTrial();
                 setStatus(trial ? message + "\n" + getString(R.string.status_try_one_done)
                         : message, !ok);
-                running.set(false);
-                exportButton.setEnabled(true);
+                finishExport();
                 return;
             }
             attemptsLeft--;
@@ -806,9 +965,15 @@ public class ConfigActivity extends Activity {
             }
             endTrial();
             setStatus(getString(R.string.status_no_response, TAG.trim()), true);
-            running.set(false);
-            exportButton.setEnabled(true);
+            finishExport();
         });
+    }
+
+    /** Takes the bar away and lets the screen be used again. */
+    private void finishExport() {
+        handler.removeCallbacks(progressPoll);
+        running.set(false);
+        setExporting(false);
     }
 
     private void openNotesApp() {
