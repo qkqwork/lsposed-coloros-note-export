@@ -65,6 +65,51 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 [`Xposed-Modules-Repo`](https://github.com/Xposed-Modules-Repo) 承载：每个模块一个仓库，
 仓库名就是模块的包名，里面的 APK 由他们的机器人从**你的 release** 同步过去。
 
+### 提交表单里的「描述」写什么
+
+三档长度都放在这里，按表单实际字段挑一个填；**模块列表与 LSPosed 管理器里显示的那一句**
+来自 APK 的 `xposeddescription`（在 `AndroidManifest.xml` 里），改它需要重新构建发布。
+
+**一句话（列表/About 用，约 40 字）**
+
+> 在便签进程内批量导出 ColorOS / OPPO 便签为 Word 或原版长图，可挑选便签、看进度并可取消，
+> 另有一键整本备份（zip）。
+
+**一段话（提交表单的长描述，中文）**
+
+> LSPosed 模块，作用域只勾「便签」。它在便签应用自己的进程内运行，读取它的数据库与渲染链路，
+> 把便签批量导出成 Word 文档或原版长图：原版长图由便签自己的「分享为图片」渲染与分页，模块只把
+> 它的页面摞成长图并补底色，所以画面与便签里看到的一致。可以按标题/分类挑选要导出的便签、看到逐条
+> 进度与预计剩余时间、随时取消；导出产物落在 `Download/便签导出/`，**不需要任何存储权限**，
+> 也不含任何第三方库（不引入 AndroidX/Material）。另有一个「整本备份」按钮，把便签的数据库与附件
+> 打包成一个 zip（同样不需要 root）。
+>
+> 导出用：Word、长图阅读/打印；备份用：换机与误删的兜底。加密便签不会被导出，回收站中的可自选。
+> 只在 ColorOS 16 / Android 16 / 便签 16.6.22 上做过逐项真机验证，其他机型与版本请自行测试。
+
+**English（一段话，给英文页面用）**
+
+> An LSPosed module for ColorOS / OPPO Notes (scope: the Notes app only). It runs inside the Notes
+> process, reads the app's own database and capture pipeline, and exports every note — or just the
+> ones you tick in its picker — as a Word document or as the app's own long picture, rendered by the
+> Notes app itself so the result matches what you see in it. Exports land in `Download/便签导出/`
+> and need no storage permission; the module carries no third-party code at all. A second button packs
+> the whole notebook — database and attachments — into a zip, with no root required. Verified on
+> ColorOS 16 / Android 16 / Notes 16.6.22 only; other devices and versions are untested.
+
+**提交 issue 里通常要填的几项**（顺序与字段名以表单当前显示为准）
+
+| 字段 | 填什么 |
+| --- | --- |
+| 模块名称 | `ColorOS Note Export` |
+| 模块包名 | `com.qkqwork.noteexport` |
+| 源码仓库 | `https://github.com/qkqwork/lsposed-coloros-note-export` |
+| 模块描述 | 上面「一段话」那一版 |
+| 作用域 | `com.coloros.note`（便签） |
+| 许可 | GPL-3.0 |
+| 是否开源 | 是 |
+| 已测试环境 | ColorOS 16（Android 16 / API 36）· 便签 16.6.22 |
+
 ### 提交前的自查
 
 | 要求 | 本项目当前状态 |
