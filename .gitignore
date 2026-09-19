@@ -15,6 +15,7 @@
 !/AndroidManifest.xml
 !/build.ps1
 !/README.md
+!/RELEASING.md
 !/LICENSE
 !/.gitignore
 

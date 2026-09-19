@@ -140,6 +140,28 @@ public class ConfigActivity extends Activity {
         refreshLayoutVisibility();
         refreshSelectedNotes();
         restorePreview();
+        showVersion();
+    }
+
+    /**
+     * Puts the version on the about block, read from the package rather than
+     * written out by hand: a number in two places is a number that disagrees.
+     */
+    private void showVersion() {
+        TextView view = findViewById(R.id.about_version);
+        if (view == null) {
+            return;
+        }
+        try {
+            android.content.pm.PackageInfo info = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0);
+            long code = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P
+                    ? info.getLongVersionCode() : info.versionCode;
+            view.setText(getString(R.string.about_version, info.versionName, code));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not read the version: " + t);
+            view.setText(getString(R.string.about_version_unknown));
+        }
     }
 
     @Override

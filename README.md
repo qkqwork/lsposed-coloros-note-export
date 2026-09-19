@@ -2,8 +2,19 @@
 
 **LSPosed 模块：批量导出 ColorOS / OPPO 便签为 Word 文档或原版长图**
 
-> 非官方项目，与 OPPO / ColorOS 无关。
-> 仅在 ColorOS 16（Android 16 / API 36）· 便签 16.6.22 上验证过。
+| | |
+| --- | --- |
+| 版本 | **1.0**（`versionCode` 1） |
+| 仓库 | <https://github.com/qkqwork/lsposed-coloros-note-export> |
+| 作者 | **qkqwork**（设备、需求与真机验证）· 代码由 **DeepSeek Harness** 编写 |
+| 许可 | GPL-3.0 |
+| 包名 | `com.qkqwork.noteexport`（LSPosed 里的名称：**ColorOS Note Export**） |
+| 作用域 | 只勾 `com.coloros.note`（便签） |
+| 已验证设备 | ColorOS 16（Android 16 / API 36）· 便签 **16.6.22** |
+| 依赖 | 无——不引入 AndroidX / Material，dex 里只有本项目自己的类 |
+
+> 非官方项目，与 OPPO / ColorOS / OnePlus 无关。
+> 发布新版本、以及上架 LSPosed 模块仓库的步骤见 [`RELEASING.md`](RELEASING.md)。
 
 ## 免责声明（先读这个）
 

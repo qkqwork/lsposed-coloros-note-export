@@ -91,5 +91,13 @@
     <string name="section_preview">最近一次导出</string>
     <string name="preview_note">导出或「先试 1 条」之后，这里会显示第一张图的顶部，用来核对底色、字色和版式。整张长图太长，只留顶部一截。</string>
 
+    <string name="section_about">关于</string>
+    <string name="about_version_unknown">版本未知</string>
+    <string name="about_version">版本 %1$s（%2$d）</string>
+    <string name="about_repo">仓库：https://github.com/qkqwork/lsposed-coloros-note-export</string>
+    <string name="about_author">作者：qkqwork（提供设备、提出需求并做真机验证）；代码由 DeepSeek Harness 编写。qkqwork 不对本项目负责。</string>
+    <string name="about_licence">许可：GPL-3.0。便签应用及其数据与本项目无关，本项目与 OPPO / ColorOS / OnePlus 无任何关联。</string>
+    <string name="about_disclaimer">请自行评估风险：模块运行在便签应用进程内，会读取其数据库并把内容写到 Download/便签导出/。安装前务必备份重要便签。</string>
+
     <string name="content_description_thumbnail">最近一次导出的缩略图</string>
 </resources>

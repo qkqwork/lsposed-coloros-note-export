@@ -390,5 +390,45 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/status_idle" />
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_about" />
+
+        <TextView
+            android:id="@+id/about_version"
+            style="@style/NoteExport.Value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/about_version_unknown" />
+
+        <TextView
+            android:id="@+id/about_repo"
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:autoLink="web"
+            android:text="@string/about_repo" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/about_author" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/about_licence" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/about_disclaimer" />
     </LinearLayout>
 </ScrollView>
