@@ -43,6 +43,19 @@ public final class ConfigContract {
     public static final String PROBE_SEGMENT = "note_dsh_probe";
 
     /**
+     * Sentinel last path segment that lists the notes, for the settings screen.
+     *
+     * <p>Only what a picker needs: the id, the title, the category and a couple of
+     * counts. The note's own text is never sent — the screen has no business
+     * holding it and does not need it to offer a list to choose from.
+     */
+    public static final String LIST_SEGMENT = "note_dsh_list";
+
+    /** Columns of that list. */
+    public static final String[] LIST_COLUMNS =
+            {"guid", "title", "category", "words", "encrypted", "recycled"};
+
+    /**
      * Sentinel last path segment that makes the injected code write an
      * environment report into Downloads. See {@code Diagnostics} for why the
      * module needs one: several of the facts the export relies on can only be
@@ -55,6 +68,10 @@ public final class ConfigContract {
 
     public static Uri exportUri(String authority) {
         return Uri.parse("content://" + authority + "/" + EXPORT_SEGMENT);
+    }
+
+    public static Uri listUri(String authority) {
+        return Uri.parse("content://" + authority + "/" + LIST_SEGMENT);
     }
 
     public static Uri probeUri(String authority) {

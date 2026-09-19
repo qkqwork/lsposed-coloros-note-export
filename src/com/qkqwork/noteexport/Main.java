@@ -132,6 +132,40 @@ public class Main implements IXposedHookLoadPackage {
 
     // ------------------------------------------------------ the export trigger
 
+    /**
+     * The notes as the settings screen needs them: what to show in a list of
+     * things to pick from, and nothing more.
+     *
+     * <p>It runs inside the Notes app, which is the only process that can read the
+     * database; the settings screen asks for it through the same provider the
+     * export trigger uses. Every note's own text stays here.
+     */
+    private static Cursor listNotes(Context context) {
+        MatrixCursor cursor = new MatrixCursor(ConfigContract.LIST_COLUMNS);
+        if (context == null) {
+            return cursor;
+        }
+        try {
+            NoteStore.Snapshot snapshot = NoteStore.read(context, true);
+            for (java.util.Map.Entry<String, java.util.List<Note>> group
+                    : NoteExporter.groupedByCategory(snapshot).entrySet()) {
+                for (Note note : group.getValue()) {
+                    cursor.addRow(new Object[] {
+                            note.id,
+                            NoteExporter.titleOf(note),
+                            group.getKey(),
+                            note.text == null ? 0 : note.text.length(),
+                            note.encrypted ? 1 : 0,
+                            note.recycled ? 1 : 0});
+                }
+            }
+            Log.i(TAG, "listed " + cursor.getCount() + " note(s) for the settings screen");
+        } catch (Throwable t) {
+            Log.w(TAG, "listing the notes failed: " + t);
+        }
+        return cursor;
+    }
+
     private void hookExportTrigger(XC_LoadPackage.LoadPackageParam param) {
         boolean hooked = false;
         for (String className : PROVIDER_CLASSES) {
@@ -148,6 +182,12 @@ public class Main implements IXposedHookLoadPackage {
                             String segment = uri.getLastPathSegment();
                             if (ConfigContract.PROBE_SEGMENT.equals(segment)) {
                                 method.setResult(probeCursor());
+                                return;
+                            }
+                            if (ConfigContract.LIST_SEGMENT.equals(segment)) {
+                                Context context = ((ContentProvider) method.thisObject)
+                                        .getContext();
+                                method.setResult(listNotes(context));
                                 return;
                             }
                             if (ConfigContract.DIAG_SEGMENT.equals(segment)) {
