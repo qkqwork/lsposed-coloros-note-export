@@ -95,7 +95,6 @@ public class Main implements IXposedHookLoadPackage {
         // is noise in every day's log and a cost at every app start; they are
         // installed on demand instead, when an export asks for debug logging.
         injectedLoader = param.classLoader;
-        NativeImageExport.install(param.classLoader);
         NativeBatchExport.install(param.classLoader);
     }
 

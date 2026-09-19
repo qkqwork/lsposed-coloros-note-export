@@ -67,6 +67,17 @@ final class NativeBatchExport {
     private static final long EDITOR_WAIT_SECONDS = 20;
     private static final long CAPTURE_WAIT_SECONDS = 90;
     private static final long SETTLE_MILLIS = 700;
+    /**
+     * How many notes in a row may come back empty before the run is abandoned.
+     *
+     * <p>Not a per-note policy: an awkward note is skipped and named in the
+     * result. This many in a row means the screen is no longer where the export
+     * believes it is — the list is closed, another app is in front, the editor
+     * stopped answering — and there is nothing left to drive.
+     */
+    private static final int STUCK_AFTER_FAILURES = 8;
+    /** How many failed titles the result line lists before it counts them. */
+    private static final int MAX_NAMES_IN_RESULT = 3;
 
     /**
      * What a dark note is read on. Measured from the picture the app itself drew
@@ -551,6 +562,7 @@ final class NativeBatchExport {
 
         ProgressNotifier.start(context, limit);
         int failuresInARow = 0;
+        List<String> failed = new ArrayList<>();
         byte[] preview = null;
         for (int i = 0; i < limit; i++) {
             if (Progress.cancelled()) {
@@ -592,12 +604,18 @@ final class NativeBatchExport {
             if (picture == null) {
                 stats.failed++;
                 failuresInARow++;
-                Log.w(TAG, "native batch: " + note.id + " produced no picture");
-                // One note the app will not open, for instance a locked one, is
-                // no reason to give up on the rest; three in a row means the
-                // screen is no longer where this expects it to be.
-                if (failuresInARow >= 3) {
-                    Log.w(TAG, "native batch: stopping after " + failuresInARow
+                failed.add(NoteExporter.titleOf(note));
+                Log.w(TAG, "native batch: " + note.id + " produced no picture ("
+                        + failuresInARow + " in a row)");
+                // A note the app will not open — a locked one, a note that has
+                // been deleted since the list was read — is no reason to throw
+                // away the rest of the run: it is recorded, named in the result,
+                // and the batch carries on. Only a run of failures this long says
+                // something other than "this note is awkward": it says the screen
+                // has stopped being where this expects it to be, and then there is
+                // nothing left to drive.
+                if (failuresInARow >= STUCK_AFTER_FAILURES) {
+                    Log.w(TAG, "native batch: giving up after " + failuresInARow
                             + " notes in a row produced nothing");
                     break;
                 }
@@ -618,6 +636,7 @@ final class NativeBatchExport {
                 }
             } else {
                 stats.failed++;
+                failed.add(NoteExporter.titleOf(note));
             }
             sleep(SETTLE_MILLIS);
         }
@@ -628,6 +647,11 @@ final class NativeBatchExport {
         }
         if (stats.failed > 0) {
             message += "，" + stats.failed + " 条失败";
+            if (!failed.isEmpty()) {
+                // Named, because "3 failed" leaves the user hunting through a
+                // folder of pictures for the ones that are not there.
+                message += "（" + names(failed) + "）";
+            }
         }
         // An export where every note was already there did what it was asked to
         // do, so it counts as a success with nothing to report but the skips.
@@ -636,9 +660,31 @@ final class NativeBatchExport {
         return new NoteExporter.Result(ok, message, root, preview);
     }
 
+    /**
+     * A few note titles, for the result line.
+     *
+     * <p>Capped, because the point is to let someone find the missing pictures,
+     * not to paste a list of fifty titles into a notification.
+     */
+    private static String names(List<String> titles) {
+        StringBuilder sb = new StringBuilder();
+        int shown = 0;
+        for (String title : titles) {
+            if (shown == MAX_NAMES_IN_RESULT) {
+                sb.append(" 等 ").append(titles.size()).append(" 条");
+                break;
+            }
+            if (sb.length() > 0) {
+                sb.append('、');
+            }
+            sb.append(title == null || title.length() == 0 ? "无标题" : title);
+            shown++;
+        }
+        return sb.toString();
+    }
+
     /** Where a note's picture goes: the folder and the file name. */
-    private static String[] targetOf(Note note, int index, String root, ExportOptions options) {
-        String dir = options.categoryFolders
+    private static String[] targetOf(Note note, int index, String root, ExportOptions options) {        String dir = options.categoryFolders
                 ? ExportSink.join(root, ExportSink.sanitize(NoteExporter.categoryOf(note)))
                 : root;
         String name = (options.numberedNames

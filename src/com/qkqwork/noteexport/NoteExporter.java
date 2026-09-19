@@ -113,13 +113,12 @@ public final class NoteExporter {
         try {
             if (options.format == ExportOptions.Format.WORD) {
                 exportWord(context, options, snapshot, root, stats);
-            } else if (options.format == ExportOptions.Format.NATIVE) {
-                // The app renders each note itself; see NativeImageExport.
-                Result result = NativeImageExport.export(context, snapshot, options, root, stats);
-                writeReadme(context, root, options, stats);
-                return withCancellation(result, stats);
-            } else if (options.format == ExportOptions.Format.NATIVE_BATCH) {
-                // Experimental: drive the app's own editor and keep what it draws.
+            } else if (options.format == ExportOptions.Format.NATIVE
+                    || options.format == ExportOptions.Format.NATIVE_BATCH) {
+                // Both are "the app draws these itself". The one-note-at-a-time
+                // route that used to live behind NATIVE was never reachable from
+                // the settings screen and is gone, so the name now means the same
+                // thing as the batch — which keeps an old provider query working.
                 Result result = NativeBatchExport.export(context, snapshot, options, root, stats);
                 writeReadme(context, root, options, stats);
                 return withCancellation(result, stats);

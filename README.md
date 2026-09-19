@@ -119,8 +119,7 @@ src/com/qkqwork/noteexport/
   ConfigContract.java        两边共享的常量（路径段、列名、取值）
   NoteSelection.java         勾选的便签（存 id，空 = 全部）
   NoteExporter.java          数据库读取 + 遍历编排（三种格式的入口与便签子集过滤）
-  NativeBatchExport.java     原版长图：驱动便签自己的 doPictureShare，摞页面、补底色、裁白
-  NativeImageExport.java     原版长图的逐条路径
+  NativeBatchExport.java     原版长图：驱动便签自己的 doPictureShare，摞页面、补底色、裁白（`NATIVE` 与 `NATIVE_BATCH` 现在同义）
   LongImageRenderer.java     模块自绘长图（HTML → WebView → PNG）
   NoteStore.java             便签数据库访问（含旧版本列数退化）
   Note.java / Doc.java       数据模型与 OOXML 片段
