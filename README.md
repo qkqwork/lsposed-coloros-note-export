@@ -3,7 +3,7 @@
 **LSPosed 模块：批量导出 ColorOS / OPPO 便签为 Word 文档或原版长图**
 
 > 非官方项目，与 OPPO / ColorOS 无关。
-> 仅在 OnePlus PKR110 · ColorOS 16（Android 16 / API 36）· 便签 16.6.22 上验证过。
+> 仅在 ColorOS 16（Android 16 / API 36）· 便签 16.6.22 上验证过。
 
 ## 免责声明（先读这个）
 
