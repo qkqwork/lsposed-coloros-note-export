@@ -103,6 +103,8 @@ public class ConfigActivity extends Activity {
             handler.postDelayed(this, PROGRESS_POLL_MS);
         }
     };
+    /** What the progress line last showed, so an unchanged poll draws nothing. */
+    private String lastProgressKey = "";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -284,16 +286,25 @@ public class ConfigActivity extends Activity {
         if (progressBar == null) {
             return;
         }
+        // Only redraw when something actually changed. The export is asked about
+        // twice a second, and a note takes longer than that to draw: without this
+        // the screen would repaint and re-announce itself several times per note
+        // while showing the very same numbers.
+        String key = done + "/" + total + "/" + title + "/" + cancelAsked;
+        if (key.equals(lastProgressKey)) {
+            return;
+        }
+        lastProgressKey = key;
         if (total > 0 && done >= 0) {
-            progressBar.setIndeterminate(false);
             progressBar.setMax(total);
             progressBar.setProgress(Math.min(done, total));
             setStatus(getString(R.string.status_progress, done, total,
                     TextUtils.isEmpty(title) ? "" : title), false);
-        } else {
-            // The Notes process answers even before its first note is done.
-            progressBar.setIndeterminate(true);
         }
+        // Before the first report the bar simply sits at zero: a spinner would
+        // say no more than the status line already does, and an animation that
+        // never stops is also what keeps a screen reader, or any tool asking the
+        // window whether it has settled, waiting for ever.
         if (cancelAsked) {
             setStatus(getString(R.string.action_cancel_asked), false);
             if (cancelButton != null) {
@@ -334,7 +345,6 @@ public class ConfigActivity extends Activity {
         if (progressBar != null) {
             progressBar.setVisibility(exporting ? View.VISIBLE : View.GONE);
             if (exporting) {
-                progressBar.setIndeterminate(true);
                 progressBar.setProgress(0);
             }
         }
