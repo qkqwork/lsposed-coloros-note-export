@@ -98,6 +98,17 @@ public final class ExportOptions {
     public boolean cardStyle;
 
     /**
+     * Copy each note's attachment files beside its picture.
+     *
+     * <p>Off by default, which is the opposite of what it used to do: a long
+     * picture already contains the photographs, so copying them again produced a
+     * folder of files the user did not ask for (an export of fifteen notes left
+     * eighty-nine files). Word documents are unaffected — they embed what they
+     * need — so this is about the image exports.
+     */
+    public boolean exportAttachments;
+
+    /**
      * Install the diagnostic probes and log their detail.
      *
      * <p>Off by default: they hook whole families of the app's methods and print

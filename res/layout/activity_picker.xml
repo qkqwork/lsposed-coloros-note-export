@@ -28,6 +28,21 @@
         android:layout_marginTop="@dimen/item_spacing"
         android:text="@string/picker_hint" />
 
+    <EditText
+        android:id="@+id/picker_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_spacing"
+        android:hint="@string/picker_search_hint"
+        android:inputType="text"
+        android:maxLines="1" />
+
+    <Spinner
+        android:id="@+id/picker_category"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/item_spacing" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

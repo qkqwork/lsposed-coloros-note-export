@@ -24,6 +24,8 @@
     <string name="option_skip">跳过已存在的文件（配合上面取消勾选，可接着上次继续导出）</string>
     <string name="option_debug">开启调试日志（详细诊断，导出很多次都不用开）</string>
     <string name="option_card">导出便签式卡片版（宽 1094 px，带卡面边距与底部一行）</string>
+    <string name="option_attachments">同时导出原始附件（图片会另外再拷一份）</string>
+    <string name="option_attachments_note">默认关闭：长图里本来就已经有那些照片，再拷一份只会让每条便签多出一个「_附件」目录（实测 15 条便签会多出 89 个文件）。便签应用自己的占位图（照片没下载下来时的灰框）无论开关都不导出。Word 文档不受影响——它需要嵌入的图会照常嵌入。</string>
     <string name="option_card_note">默认关闭时导出的是干净的原版长图：编辑器原始 1264 px 宽、无卡面边距、无底部那一行。打开后改成像便签「分享为图片」那样的卡片：宽度 1094 px、四周卡面边距，底部按「分享长图的水印」这一项画一条分割线加你的文字（选「去掉」或「不动它」就不画，「留白」留一条空白）。卡片由模块合成，字体与间距是仿的，不会和便签自己分享的那张逐像素一致。</string>
     <string name="option_debug_note">调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，只在排查问题时勾选。</string>
 
@@ -44,8 +46,10 @@
     <string name="action_export">开始导出</string>
     <string name="action_cancel">取消导出</string>
     <string name="action_cancel_asked">已请求取消：正在画的那一条会画完，之后就停。</string>
-    <string name="status_progress">正在导出 %1$d / %2$d：%3$s</string>
-    <string name="status_progress_unknown">正在导出…（便签还没回报进度）</string>
+    <string name="status_progress">正在导出 %1$d / %2$d%3$s%4$s</string>
+    <string name="status_progress_eta">（约剩 %1$s）</string>
+    <string name="duration_seconds">%1$d 秒</string>
+    <string name="duration_minutes">%1$d 分 %2$d 秒</string>
     <string name="action_try_one">先试 1 条</string>
     <string name="action_open_folder">打开导出目录</string>
     <string name="action_reset">恢复默认设置</string>
@@ -66,10 +70,14 @@
     <string name="action_pick_notes">选择便签…</string>
 
     <string name="picker_title">选择要导出的便签</string>
+    <string name="picker_search_hint">搜索标题或分类</string>
+    <string name="picker_category_all">全部分类</string>
+    <string name="picker_no_category">未分类</string>
+    <string name="picker_summary_filtered">共 %1$d 条便签，已勾选 %2$d 条（当前显示 %3$d 条）</string>
     <!-- The same words the exported documents use for a note whose title is empty. -->
     <string name="untitled">无标题</string>
     <string name="words">字</string>
-    <string name="picker_hint">勾选想导出的便签，然后点「完成」。一条都不勾 = 导出全部。列表由便签应用提供，标题与分类原样照搬。</string>
+    <string name="picker_hint">勾选想导出的便签，然后点「完成」。一条都不勾 = 导出全部。可以用上面的搜索框按标题/分类找，也可以选某个分类；「全选 / 全不选」只作用于当前显示出来的这几条。列表由便签应用提供，标题与分类原样照搬。</string>
     <string name="picker_all">全选</string>
     <string name="picker_none">全不选</string>
     <string name="picker_done">完成</string>

@@ -50,6 +50,8 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteHtm
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteSelection.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteStore$Snapshot.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteStore.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PickerActivity$1.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PickerActivity$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PickerActivity$Row.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PickerActivity.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PipelineProbe$Tracer.class

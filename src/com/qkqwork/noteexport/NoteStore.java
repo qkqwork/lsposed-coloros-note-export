@@ -29,6 +29,14 @@ import java.util.Map;
  */
 public final class NoteStore {
 
+    /**
+     * The app's own suffix for the grey stand-in it shows while a picture loads.
+     *
+     * <p>Those files are never the user's picture, only ever a rectangle with a
+     * placeholder glyph in it.
+     */
+    private static final String PLACEHOLDER = "_placeholder";
+
     private static final String TAG = Main.TAG;
     private static final String DB_NAME = "nearme_note.db";
     private static final String TABLE_NOTES = "rich_notes";
@@ -236,6 +244,15 @@ public final class NoteStore {
         return dir.isDirectory() ? dir : null;
     }
 
+    /**
+     * The files that belong to a note, the app's own placeholders left out.
+     *
+     * <p>The folder holds the app's working files beside the user's:
+     * {@code <id>_placeholder.png} is the grey box the app shows while a picture
+     * is loading — or forever, for a note whose pictures only exist in the cloud.
+     * Copying those into an export gives the user a file per photograph that
+     * contains none of it, so they are skipped and said so in the log.
+     */
     public static List<File> attachmentFiles(Context context, Note note) {
         List<File> result = new ArrayList<>();
         File dir = attachmentDir(context, note);
@@ -247,9 +264,14 @@ public final class NoteStore {
             return result;
         }
         for (File file : files) {
-            if (file.isFile() && file.length() > 0) {
-                result.add(file);
+            if (!file.isFile() || file.length() == 0) {
+                continue;
             }
+            if (file.getName().contains(PLACEHOLDER)) {
+                Log.i(TAG, "attachment " + file.getName() + " is the app's placeholder, skipped");
+                continue;
+            }
+            result.add(file);
         }
         return result;
     }

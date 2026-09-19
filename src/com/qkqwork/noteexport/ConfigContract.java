@@ -135,6 +135,11 @@ public final class ConfigContract {
      * text. Off by default — the bare note keeps the editor's own 1264 px.
      */
     public static final String COLUMN_CARD_STYLE = "card_style";
+    /**
+     * Whether an image export also copies each note's attachment files beside
+     * its picture. Off by default: the picture already contains them.
+     */
+    public static final String COLUMN_EXPORT_ATTACHMENTS = "export_attachments";
     public static final String COLUMN_DEBUG = "debug_logging";
     public static final String COLUMN_WATERMARK_MODE = "watermark_mode";
     public static final String COLUMN_WATERMARK_TEXT = "watermark_text";

@@ -7,15 +7,23 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * The tick list of notes: what the export should cover.
@@ -30,19 +38,28 @@ import java.util.List;
  * handle that survives the trip into the other process, and because "these
  * twelve, not the other hundred" is a decision someone makes once and then
  * exports again next week.
+ *
+ * <p>What is ticked is held here rather than read back off the views: filtering
+ * the list throws the rows away and builds new ones, and a tick has to survive
+ * that. Ticking, searching and changing category all end in the same redraw.
  */
 public class PickerActivity extends Activity {
 
     private static final String TAG = Main.TAG;
 
-    /** The rows, in the order the notes came back; the ids line up with them. */
-    private final List<CheckBox> rows = new ArrayList<>();
-    private final List<String> ids = new ArrayList<>();
-    /** What was ticked when the screen opened, so an unfinished visit can go back. */
-    private List<String> initial = new ArrayList<>();
+    /** Every note as the provider described it, in the order it arrived. */
+    private final List<Row> all = new ArrayList<>();
+    /** The ticked note ids. */
+    private final Set<String> ticked = new LinkedHashSet<>();
+    /** The rows currently on screen, so 全选 can act on what is being looked at. */
+    private final List<Row> shown = new ArrayList<>();
 
     private LinearLayout listView;
     private TextView statusView;
+    private EditText search;
+    private Spinner categories;
+    /** Empty means every category; the spinner's first entry. */
+    private String categoryFilter = "";
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -51,19 +68,39 @@ public class PickerActivity extends Activity {
         setContentView(R.layout.activity_picker);
         listView = findViewById(R.id.picker_list);
         statusView = findViewById(R.id.picker_status);
-        initial = NoteSelection.read(this);
+        search = findViewById(R.id.picker_search);
+        categories = findViewById(R.id.picker_category);
+        ticked.addAll(NoteSelection.read(this));
 
         View all = findViewById(R.id.picker_all);
         if (all != null) {
-            all.setOnClickListener(view -> setAll(true));
+            all.setOnClickListener(view -> tickShown(true));
         }
         View none = findViewById(R.id.picker_none);
         if (none != null) {
-            none.setOnClickListener(view -> setAll(false));
+            none.setOnClickListener(view -> tickShown(false));
         }
         View done = findViewById(R.id.picker_done);
         if (done != null) {
             done.setOnClickListener(view -> finishWithSelection());
+        }
+        if (search != null) {
+            search.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+                    // nothing to do before the text changes
+                }
+
+                @Override
+                public void onTextChanged(CharSequence text, int start, int before, int count) {
+                    // and nothing to do while it is changing
+                }
+
+                @Override
+                public void afterTextChanged(Editable text) {
+                    render();
+                }
+            });
         }
 
         loadNotes();
@@ -134,20 +171,128 @@ public class PickerActivity extends Activity {
                     error != null);
             return;
         }
+        all.clear();
+        all.addAll(notes);
+        // A tick for a note that is no longer there is dropped, so the count the
+        // screen shows is the count an export would use.
+        Set<String> present = new LinkedHashSet<>();
         for (Row note : notes) {
+            if (ticked.contains(note.id)) {
+                present.add(note.id);
+            }
+        }
+        ticked.clear();
+        ticked.addAll(present);
+        buildCategories();
+        render();
+    }
+
+    /** The spinner's entries: every category the notes actually use. */
+    private void buildCategories() {
+        if (categories == null) {
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        names.add(getString(R.string.picker_category_all));
+        for (Row note : all) {
+            String name = TextUtils.isEmpty(note.category)
+                    ? getString(R.string.picker_no_category) : note.category;
+            if (!names.contains(name)) {
+                names.add(name);
+            }
+        }
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, names);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        categories.setAdapter(adapter);
+        categories.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                categoryFilter = position == 0 ? "" : names.get(position);
+                render();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                categoryFilter = "";
+                render();
+            }
+        });
+    }
+
+    /** Draws the notes that match the search box and the category, and no others. */
+    private void render() {
+        if (listView == null) {
+            return;
+        }
+        String needle = search == null ? "" : search.getText().toString().trim().toLowerCase();
+        listView.removeAllViews();
+        shown.clear();
+        for (Row note : all) {
+            if (!categoryFilter.isEmpty() && !categoryFilter.equals(categoryName(note))) {
+                continue;
+            }
+            if (!needle.isEmpty() && !note.matches(needle)) {
+                continue;
+            }
             CheckBox box = (CheckBox) getLayoutInflater()
                     .inflate(R.layout.picker_row, listView, false);
             box.setText(note.label(this));
             // An encrypted note cannot be read by the export at all, so it is
             // shown — its absence would look like a bug — but cannot be ticked.
             box.setEnabled(!note.encrypted);
-            box.setChecked(!note.encrypted && NoteSelection.contains(initial, note.id));
-            box.setOnCheckedChangeListener((button, checked) -> refreshSummary());
+            box.setChecked(!note.encrypted && ticked.contains(note.id));
+            box.setOnCheckedChangeListener((button, checked) -> {
+                if (checked) {
+                    ticked.add(note.id);
+                } else {
+                    ticked.remove(note.id);
+                }
+                refreshSummary();
+            });
             listView.addView(box);
-            rows.add(box);
-            ids.add(note.id);
+            shown.add(note);
         }
         refreshSummary();
+    }
+
+    private String categoryName(Row note) {
+        return TextUtils.isEmpty(note.category)
+                ? getString(R.string.picker_no_category) : note.category;
+    }
+
+    /** Ticks or unticks what is on screen, which is what a filter leaves visible. */
+    private void tickShown(boolean checked) {
+        for (Row note : shown) {
+            if (note.encrypted) {
+                continue;
+            }
+            if (checked) {
+                ticked.add(note.id);
+            } else {
+                ticked.remove(note.id);
+            }
+        }
+        render();
+    }
+
+    private void refreshSummary() {
+        setStatus(shown.size() == all.size()
+                ? getString(R.string.picker_summary, all.size(), ticked.size())
+                : getString(R.string.picker_summary_filtered, all.size(), ticked.size(),
+                        shown.size()), false);
+    }
+
+    private void finishWithSelection() {
+        NoteSelection.save(this, new ArrayList<>(ticked));
+        Log.i(TAG, "the picker kept " + ticked.size() + " of " + all.size() + " note(s)");
+        setResult(RESULT_OK, new Intent());
+        finish();
+    }
+
+    private void setStatus(String message, boolean error) {
+        statusView.setTextColor(getColor(error ? R.color.error_text : R.color.ok_text));
+        statusView.setText(message);
     }
 
     /**
@@ -165,45 +310,6 @@ public class PickerActivity extends Activity {
             }
         }
         return true;
-    }
-
-    private void setAll(boolean checked) {
-        for (CheckBox box : rows) {
-            if (checked && !box.isEnabled()) {
-                continue;
-            }
-            box.setChecked(checked);
-        }
-        refreshSummary();
-    }
-
-    private void refreshSummary() {
-        int total = rows.size();
-        int ticked = 0;
-        for (CheckBox box : rows) {
-            if (box.isChecked()) {
-                ticked++;
-            }
-        }
-        setStatus(getString(R.string.picker_summary, total, ticked), false);
-    }
-
-    private void finishWithSelection() {
-        List<String> chosen = new ArrayList<>();
-        for (int i = 0; i < rows.size(); i++) {
-            if (rows.get(i).isChecked()) {
-                chosen.add(ids.get(i));
-            }
-        }
-        NoteSelection.save(this, chosen);
-        Log.i(TAG, "the picker kept " + chosen.size() + " of " + rows.size() + " note(s)");
-        setResult(RESULT_OK, new Intent());
-        finish();
-    }
-
-    private void setStatus(String message, boolean error) {
-        statusView.setTextColor(getColor(error ? R.color.error_text : R.color.ok_text));
-        statusView.setText(message);
     }
 
     /** One note as the provider describes it: no text, just what it is. */
@@ -234,6 +340,12 @@ public class PickerActivity extends Activity {
                     number(cursor, "words"),
                     flag(cursor, "encrypted"),
                     flag(cursor, "recycled"));
+        }
+
+        /** Whether the search box's text appears in the title or the category. */
+        boolean matches(String needle) {
+            String haystack = (title == null ? "" : title) + " " + (category == null ? "" : category);
+            return haystack.toLowerCase().contains(needle);
         }
 
         /** The one line the tick box shows. */

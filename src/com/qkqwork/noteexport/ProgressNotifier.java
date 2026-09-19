@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.net.Uri;
 import android.util.Log;
 
 /**
@@ -90,6 +91,16 @@ final class ProgressNotifier {
             if (open != null) {
                 builder.setContentIntent(open);
             }
+            // A finished export is the moment someone wants the folder, and the
+            // notification is where they will be looking: the action saves them
+            // opening the app, which then opens the folder anyway.
+            if (finished) {
+                PendingIntent folder = folder(context);
+                if (folder != null) {
+                    builder.addAction(new Notification.Action.Builder(null, "打开导出目录", folder)
+                            .build());
+                }
+            }
             manager.notify(NOTIFICATION_ID, builder.build());
         } catch (Throwable t) {
             Log.w(TAG, "could not post the progress notification: " + t);
@@ -105,6 +116,29 @@ final class ProgressNotifier {
             return PendingIntent.getActivity(context, 0, intent,
                     PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * The action that opens the export folder.
+     *
+     * <p>The file manager is asked for the folder as a document, the same way the
+     * settings screen's own button does it; the intent is only built here, and
+     * the system starts it when the action is tapped.
+     */
+    private static PendingIntent folder(Context context) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(Uri.parse(
+                    "content://com.android.externalstorage.documents/document/primary%3ADownload"
+                            + "%2F" + Uri.encode(ExportRequest.DIR)),
+                    "vnd.android.document/directory");
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            return PendingIntent.getActivity(context, 1, intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        } catch (Throwable t) {
+            Log.w(TAG, "could not build the folder action: " + t);
             return null;
         }
     }

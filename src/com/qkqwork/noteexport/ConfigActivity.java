@@ -72,6 +72,8 @@ public class ConfigActivity extends Activity {
     private CheckBox debugBox;
     /** Whether the long picture is drawn as the app's share card. */
     private CheckBox cardBox;
+    /** Whether an image export also copies each note's attachments. */
+    private CheckBox attachmentsBox;
     /**
      * States which background the long pictures will get.
      *
@@ -105,6 +107,9 @@ public class ConfigActivity extends Activity {
     };
     /** What the progress line last showed, so an unchanged poll draws nothing. */
     private String lastProgressKey = "";
+    /** When the first counted note was reported, for the estimate below. */
+    private long progressStartedAt;
+    private int progressStartedDone;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -166,6 +171,7 @@ public class ConfigActivity extends Activity {
         skipBox = findViewById(R.id.option_skip);
         debugBox = findViewById(R.id.option_debug);
         cardBox = findViewById(R.id.option_card);
+        attachmentsBox = findViewById(R.id.option_attachments);
         backgroundValue = findViewById(R.id.background_value);
         watermarkGroup = findViewById(R.id.watermark_group);
         watermarkText = findViewById(R.id.watermark_text);
@@ -193,7 +199,7 @@ public class ConfigActivity extends Activity {
         }
         CompoundButton.OnCheckedChangeListener saver = (button, checked) -> saveOptions();
         for (CheckBox box : new CheckBox[]{recycledBox, numberedBox, foldersBox,
-                stampedBox, skipBox, cardBox, debugBox}) {
+                stampedBox, skipBox, attachmentsBox, cardBox, debugBox}) {
             if (box != null) {
                 box.setOnCheckedChangeListener(saver);
             }
@@ -298,8 +304,9 @@ public class ConfigActivity extends Activity {
         if (total > 0 && done >= 0) {
             progressBar.setMax(total);
             progressBar.setProgress(Math.min(done, total));
-            setStatus(getString(R.string.status_progress, done, total,
-                    TextUtils.isEmpty(title) ? "" : title), false);
+            String tail = TextUtils.isEmpty(title) ? "" : "：" + title;
+            setStatus(getString(R.string.status_progress, done, total, tail,
+                    remaining(done, total)), false);
         }
         // Before the first report the bar simply sits at zero: a spinner would
         // say no more than the status line already does, and an animation that
@@ -311,6 +318,34 @@ public class ConfigActivity extends Activity {
                 cancelButton.setEnabled(false);
             }
         }
+    }
+
+    /**
+     * How long the rest of the export looks likely to take, as a short suffix.
+     *
+     * <p>Measured from the first report that had a number in it, since the wait
+     * before the app's first note says nothing about how long a note takes. Left
+     * out until there is enough to say — one note's worth of data would be a
+     * guess dressed up as a promise.
+     */
+    private String remaining(int done, int total) {
+        long now = System.currentTimeMillis();
+        if (progressStartedAt == 0 || done <= progressStartedDone || total <= done) {
+            if (progressStartedAt == 0 && done > 0) {
+                progressStartedAt = now;
+                progressStartedDone = done;
+            }
+            return "";
+        }
+        long perNote = (now - progressStartedAt) / Math.max(1, done - progressStartedDone);
+        long left = perNote * (total - done);
+        if (left < 5000) {
+            return "";
+        }
+        long seconds = left / 1000;
+        return getString(R.string.status_progress_eta, seconds >= 60
+                ? getString(R.string.duration_minutes, seconds / 60, seconds % 60)
+                : getString(R.string.duration_seconds, seconds));
     }
 
     /** Asks the export running in the Notes process to stop. */
@@ -694,6 +729,7 @@ public class ConfigActivity extends Activity {
         options.skipExisting = skipBox != null && skipBox.isChecked();
         options.debug = debugBox != null && debugBox.isChecked();
         options.cardStyle = cardBox != null && cardBox.isChecked();
+        options.exportAttachments = attachmentsBox != null && attachmentsBox.isChecked();
         // The picker's tick list, which an empty list turns back into "everything".
         options.guids.addAll(NoteSelection.read(this));
         options.limit = 0;
@@ -729,6 +765,8 @@ public class ConfigActivity extends Activity {
             check(skipBox, prefs.getBoolean(ConfigContract.COLUMN_SKIP, false));
             check(debugBox, prefs.getBoolean(ConfigContract.COLUMN_DEBUG, false));
             check(cardBox, prefs.getBoolean(ConfigContract.COLUMN_CARD_STYLE, false));
+            check(attachmentsBox,
+                    prefs.getBoolean(ConfigContract.COLUMN_EXPORT_ATTACHMENTS, false));
             if (limitBox != null) {
                 limitBox.setText(prefs.getString(ConfigContract.COLUMN_LIMIT, ""));
             }
@@ -778,6 +816,7 @@ public class ConfigActivity extends Activity {
                 .putBoolean(ConfigContract.COLUMN_SKIP, options.skipExisting)
                 .putBoolean(ConfigContract.COLUMN_DEBUG, options.debug)
                 .putBoolean(ConfigContract.COLUMN_CARD_STYLE, options.cardStyle)
+                .putBoolean(ConfigContract.COLUMN_EXPORT_ATTACHMENTS, options.exportAttachments)
                 .putString(ConfigContract.COLUMN_LIMIT,
                         limitBox == null ? "" : limitBox.getText().toString().trim())
                 // Committed rather than applied: an option is written the moment
@@ -811,6 +850,7 @@ public class ConfigActivity extends Activity {
             check(skipBox, false);
             check(debugBox, false);
             check(cardBox, false);
+            check(attachmentsBox, false);
             if (limitBox != null) {
                 limitBox.setText("");
             }
@@ -888,6 +928,8 @@ public class ConfigActivity extends Activity {
         ExportRequest.write(options);
 
         setStatus(getString(R.string.status_asking), false);
+        progressStartedAt = 0;
+        progressStartedDone = 0;
         setExporting(true);
         attemptsLeft = 2;
 

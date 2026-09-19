@@ -47,6 +47,8 @@ public final class ExportRequest {
     public static final String KEY_DEBUG = "debug";
     /** Draw the long picture as the app's share card, footer and all. */
     public static final String KEY_CARD = "card";
+    /** Copy each note's attachment files beside its picture. */
+    public static final String KEY_ATTACHMENTS = "attach";
     /**
      * The notes this export should cover, as note ids joined by {@code |}.
      *
@@ -105,6 +107,7 @@ public final class ExportRequest {
             properties.setProperty(KEY_RECYCLED, options.includeRecycled ? "1" : "0");
             properties.setProperty(KEY_STAMPED, options.timestampedFolder ? "1" : "0");
             properties.setProperty(KEY_CARD, options.cardStyle ? "1" : "0");
+            properties.setProperty(KEY_ATTACHMENTS, options.exportAttachments ? "1" : "0");
             FileOutputStream out = new FileOutputStream(target);
             try {
                 properties.store(out, "ColorOS note export request");
@@ -160,6 +163,9 @@ public final class ExportRequest {
         }
         if (options.cardStyle) {
             sb.append(';').append(KEY_CARD).append("=1");
+        }
+        if (options.exportAttachments) {
+            sb.append(';').append(KEY_ATTACHMENTS).append("=1");
         }
         if (options.hasSelection()) {
             int sent = 0;
@@ -257,6 +263,8 @@ public final class ExportRequest {
                 options.debug = !"0".equals(value);
             } else if (KEY_CARD.equals(key)) {
                 options.cardStyle = !"0".equals(value);
+            } else if (KEY_ATTACHMENTS.equals(key)) {
+                options.exportAttachments = !"0".equals(value);
             } else if (KEY_NOTES.equals(key)) {
                 options.guids.clear();
                 options.guids.addAll(NoteSelection.split(value));
@@ -291,6 +299,7 @@ public final class ExportRequest {
             options.includeRecycled = !"0".equals(properties.getProperty(KEY_RECYCLED, "1"));
             options.timestampedFolder = !"0".equals(properties.getProperty(KEY_STAMPED, "1"));
             options.cardStyle = !"0".equals(properties.getProperty(KEY_CARD, "0"));
+            options.exportAttachments = "1".equals(properties.getProperty(KEY_ATTACHMENTS, "0"));
             // The picked notes travel in the file too: the fallback path starts an
             // export when the Notes app is opened, and an export that quietly
             // widened a selection to the whole notebook would be a bad surprise.

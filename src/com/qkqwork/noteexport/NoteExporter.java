@@ -109,7 +109,12 @@ public final class NoteExporter {
 
         // Counted the same way the export itself picks its notes, so the bar the
         // screen draws matches the work that is about to happen.
-        Progress.start(countNotes(groupsToExport(snapshot, options)));
+        int total = countNotes(groupsToExport(snapshot, options));
+        Progress.start(total);
+        // Every format reports through the same notification now, not only the one
+        // that drives the app's screens: a Word export of sixty notes is a minute
+        // of waiting too, and the shade is where people look.
+        ProgressNotifier.start(context, total);
         try {
             if (options.format == ExportOptions.Format.WORD) {
                 exportWord(context, options, snapshot, root, stats);
@@ -135,6 +140,9 @@ public final class NoteExporter {
             summary += "（跳过 " + stats.encrypted + " 条加密便签）";
         }
         Log.i(TAG, summary);
+        // The formats below drive the app's own screens and post their own
+        // result; these two do not, so the notification is brought to an end here.
+        ProgressNotifier.finish(context, summary, true);
         return withCancellation(new Result(true, summary, root, thumbnail), stats);
     }
 
@@ -241,7 +249,8 @@ public final class NoteExporter {
     private static void exportWord(Context context, ExportOptions options,
             NoteStore.Snapshot snapshot, String root, Stats stats) throws Exception {
         Map<String, List<Note>> groups = groupsToExport(snapshot, options);
-        stats.exported = countNotes(groups);
+        int total = countNotes(groups);
+        stats.exported = total;
         if (options.wordLayout == ExportOptions.WordLayout.SINGLE) {
             Doc doc = new Doc();
             appendTitlePage(doc, snapshot, options);
@@ -255,7 +264,7 @@ public final class NoteExporter {
                         break;
                     }
                     index++;
-                    Progress.step(stats.notes, titleOf(note));
+                    ProgressNotifier.progress(context, stats.notes, total, titleOf(note));
                     // A per-note heading makes the category's contents visible in
                     // Word's navigation pane and keeps Ctrl+F usable.
                     doc.add(heading(prefix(index) + titleOf(note), 2));
@@ -302,7 +311,7 @@ public final class NoteExporter {
                     break;
                 }
                 index++;
-                Progress.step(stats.notes, titleOf(note));
+                ProgressNotifier.progress(context, stats.notes, total, titleOf(note));
                 String base = prefix(index) + ExportSink.fileName(titleOf(note), UNTITLED);
                 Doc doc = new Doc();
                 doc.add(heading(titleOf(note), 1));
@@ -345,8 +354,9 @@ public final class NoteExporter {
     private static byte[] exportImages(Context context, ExportOptions options,
             NoteStore.Snapshot snapshot, String root, Stats stats) {
         byte[] preview = null;
-        for (Map.Entry<String, List<Note>> group
-                : groupsToExport(snapshot, options).entrySet()) {
+        Map<String, List<Note>> groups = groupsToExport(snapshot, options);
+        int total = countNotes(groups);
+        for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
             if (Progress.cancelled()) {
                 break;
             }
@@ -358,7 +368,7 @@ public final class NoteExporter {
                     break;
                 }
                 index++;
-                Progress.step(stats.notes, titleOf(note));
+                ProgressNotifier.progress(context, stats.notes, total, titleOf(note));
                 String base = prefix(index) + ExportSink.fileName(titleOf(note), UNTITLED);
                 String name = truncate(base, MAX_NAME - 5) + ".png";
                 ExportSink sink = null;
@@ -387,7 +397,9 @@ public final class NoteExporter {
                     }
                     stats.failed++;
                 }
-                copyAttachments(context, note, dir, base, stats);
+                if (options.exportAttachments) {
+                    copyAttachments(context, note, dir, base, stats);
+                }
             }
         }
         return preview;
@@ -542,7 +554,12 @@ public final class NoteExporter {
             sb.append("\r\n目录说明：\r\n");
             sb.append("  便签按分类分子目录，便签应用里的分类名就是这里的目录名。\r\n");
             sb.append("  便签在回收站中时归入「回收站」目录。\r\n");
-            sb.append("  每条便签的图片等附件放在同名的「_附件」目录里。\r\n");
+            if (options.exportAttachments) {
+                sb.append("  每条便签的图片等附件放在同名的「_附件」目录里。\r\n");
+            } else {
+                sb.append("  长图/文档里已经含了图片，所以没有另外再拷一份附件；"
+                        + "需要原始附件时在设置页打开「同时导出原始附件」。\r\n");
+            }
 
             sink = ExportSink.open(context, root, README, "text/plain");
             OutputStream out = sink.stream();
