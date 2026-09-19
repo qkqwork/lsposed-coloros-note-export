@@ -176,6 +176,26 @@
             style="@style/NoteExport.Section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="@string/section_notes" />
+
+        <TextView
+            android:id="@+id/selected_notes"
+            style="@style/NoteExport.Value"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/notes_all" />
+
+        <Button
+            android:id="@+id/action_pick_notes"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:text="@string/action_pick_notes" />
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="@string/section_background" />
 
         <TextView

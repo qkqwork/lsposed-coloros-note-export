@@ -109,6 +109,13 @@ public final class ConfigContract {
     public static final String COLUMN_DEBUG = "debug_logging";
     public static final String COLUMN_WATERMARK_MODE = "watermark_mode";
     public static final String COLUMN_WATERMARK_TEXT = "watermark_text";
+    /**
+     * The notes the picker has ticked, as note ids joined by {@code |}.
+     *
+     * <p>Empty means every note, which is what a screen nobody has touched asks
+     * for — and what a picker with nothing ticked goes back to.
+     */
+    public static final String COLUMN_SELECTED_NOTES = "selected_notes";
 
     // --------------------------------------------------- the long picture's paper
 

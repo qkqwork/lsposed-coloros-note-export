@@ -145,7 +145,7 @@ public final class NoteExporter {
      */
     static Map<String, List<Note>> groupsToExport(NoteStore.Snapshot snapshot,
             ExportOptions options) {
-        Map<String, List<Note>> groups = groupedByCategory(snapshot);
+        Map<String, List<Note>> groups = pick(groupsBySelection(snapshot, options));
         if (options.limit <= 0) {
             return groups;
         }
@@ -161,6 +161,50 @@ public final class NoteExporter {
             left -= take;
         }
         return limited;
+    }
+
+    /**
+     * The notes the picker asked for, in the order the notebook keeps them.
+     *
+     * <p>A selection that matches nothing is honoured as written rather than
+     * widened: the notes may simply have been deleted since they were ticked, and
+     * exporting the whole notebook instead would be the worse answer. The empty
+     * selection, which is what a screen nobody has used asks for, means all.
+     */
+    private static Map<String, List<Note>> groupsBySelection(NoteStore.Snapshot snapshot,
+            ExportOptions options) {
+        Map<String, List<Note>> groups = groupedByCategory(snapshot);
+        if (!options.hasSelection()) {
+            return groups;
+        }
+        Map<String, List<Note>> chosen = new LinkedHashMap<>();
+        int found = 0;
+        for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
+            List<Note> kept = new ArrayList<>();
+            for (Note note : group.getValue()) {
+                if (NoteSelection.contains(options.guids, note.id)) {
+                    kept.add(note);
+                    found++;
+                }
+            }
+            if (!kept.isEmpty()) {
+                chosen.put(group.getKey(), kept);
+            }
+        }
+        Log.i(TAG, "the selection covers " + found + " of the "
+                + countNotes(groups) + " note(s)");
+        return chosen;
+    }
+
+    /** The same grouping, with the empty categories left out. */
+    private static Map<String, List<Note>> pick(Map<String, List<Note>> groups) {
+        Map<String, List<Note>> kept = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Note>> group : groups.entrySet()) {
+            if (!group.getValue().isEmpty()) {
+                kept.put(group.getKey(), group.getValue());
+            }
+        }
+        return kept;
     }
 
     /** How many notes those groups hold. */

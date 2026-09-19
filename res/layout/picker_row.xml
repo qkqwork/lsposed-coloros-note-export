@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One note in the picker: what it is called, and where it lives. -->
+<CheckBox xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/row_check"
+    style="@style/NoteExport.Option"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content" />

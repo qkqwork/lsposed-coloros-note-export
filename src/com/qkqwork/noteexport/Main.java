@@ -145,6 +145,13 @@ public class Main implements IXposedHookLoadPackage {
         if (context == null) {
             return cursor;
         }
+        // Same reason as an export: this provider answers anyone who asks, and
+        // the list is every note title in the notebook.
+        if (!callerAllowed(context)) {
+            int uid = Binder.getCallingUid();
+            Log.w(TAG, "refusing a note list request from uid " + uid);
+            return cursor;
+        }
         try {
             NoteStore.Snapshot snapshot = NoteStore.read(context, true);
             for (java.util.Map.Entry<String, java.util.List<Note>> group

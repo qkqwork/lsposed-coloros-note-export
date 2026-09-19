@@ -535,7 +535,9 @@ final class NativeBatchExport {
     static NoteExporter.Result export(Context context, NoteStore.Snapshot snapshot,
             ExportOptions options, String root, NoteExporter.Stats stats) {
         List<Note> notes = new ArrayList<>();
-        for (List<Note> group : NoteExporter.groupedByCategory(snapshot).values()) {
+        // The same grouping the other formats use, so a picked selection and a
+        // limit mean here exactly what they mean there.
+        for (List<Note> group : NoteExporter.groupsToExport(snapshot, options).values()) {
             notes.addAll(group);
         }
         int limit = options.limit > 0 ? Math.min(options.limit, notes.size()) : notes.size();

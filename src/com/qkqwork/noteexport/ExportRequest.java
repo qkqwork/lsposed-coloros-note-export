@@ -45,6 +45,23 @@ public final class ExportRequest {
     public static final String KEY_SKIP = "skip";
     /** Install the diagnostic probes for this export. */
     public static final String KEY_DEBUG = "debug";
+    /**
+     * The notes this export should cover, as note ids joined by {@code |}.
+     *
+     * <p>Absent means every note. The list is only sent when the picker has
+     * narrowed things down, so the common export keeps its query short.
+     */
+    public static final String KEY_NOTES = "notes";
+
+    /**
+     * How many note ids one query may carry.
+     *
+     * <p>A selection crosses into the Notes process as the query's selection
+     * string, which travels over a binder transaction with about a megabyte to
+     * share: a few hundred ids are a few kilobytes, and a notebook with more
+     * notes than this is better exported whole than one query at a time.
+     */
+    private static final int MAX_NOTES_IN_QUERY = 400;
 
     /** Result of reading the file: the options plus the request id. */
     public static final class Request {
@@ -138,6 +155,28 @@ public final class ExportRequest {
         if (options.debug) {
             sb.append(';').append(KEY_DEBUG).append("=1");
         }
+        if (options.hasSelection()) {
+            int sent = 0;
+            StringBuilder ids = new StringBuilder();
+            for (String id : options.guids) {
+                if (id == null || id.length() == 0) {
+                    continue;
+                }
+                if (sent == MAX_NOTES_IN_QUERY) {
+                    Log.w(TAG, "only the first " + MAX_NOTES_IN_QUERY
+                            + " selected notes fit in one query");
+                    break;
+                }
+                if (sent > 0) {
+                    ids.append('|');
+                }
+                ids.append(id);
+                sent++;
+            }
+            if (sent > 0) {
+                sb.append(';').append(KEY_NOTES).append('=').append(ids);
+            }
+        }
         return sb.toString();
     }
 
@@ -210,6 +249,9 @@ public final class ExportRequest {
                 options.skipExisting = !"0".equals(value);
             } else if (KEY_DEBUG.equals(key)) {
                 options.debug = !"0".equals(value);
+            } else if (KEY_NOTES.equals(key)) {
+                options.guids.clear();
+                options.guids.addAll(NoteSelection.split(value));
             }
         }
         return options;
@@ -240,6 +282,11 @@ public final class ExportRequest {
                     : ExportOptions.WordLayout.SINGLE;
             options.includeRecycled = !"0".equals(properties.getProperty(KEY_RECYCLED, "1"));
             options.timestampedFolder = !"0".equals(properties.getProperty(KEY_STAMPED, "1"));
+            // The picked notes travel in the file too: the fallback path starts an
+            // export when the Notes app is opened, and an export that quietly
+            // widened a selection to the whole notebook would be a bad surprise.
+            options.guids.clear();
+            options.guids.addAll(NoteSelection.split(properties.getProperty(KEY_NOTES, "")));
         } catch (Throwable t) {
             Log.w(TAG, "could not read the request file: " + t);
         } finally {

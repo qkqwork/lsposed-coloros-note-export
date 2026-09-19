@@ -84,6 +84,8 @@ public class ConfigActivity extends Activity {
     private TextView statusView;
     /** The top of the first picture of the last export, once there is one. */
     private ImageView previewView;
+    /** How many notes the picker has ticked; none means all of them. */
+    private TextView selectedNotesView;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -112,7 +114,15 @@ public class ConfigActivity extends Activity {
         bindViews();
         restoreOptions();
         refreshLayoutVisibility();
+        refreshSelectedNotes();
         restorePreview();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Coming back from the picker is the one moment the count can have moved.
+        refreshSelectedNotes();
     }
 
     // ------------------------------------------------------------------ the UI
@@ -142,6 +152,7 @@ public class ConfigActivity extends Activity {
         exportButton = findViewById(R.id.action_export);
         statusView = findViewById(R.id.status);
         previewView = findViewById(R.id.preview);
+        selectedNotesView = findViewById(R.id.selected_notes);
 
         if (formatGroup != null) {
             formatGroup.setOnCheckedChangeListener((group, checked) -> {
@@ -198,6 +209,36 @@ public class ConfigActivity extends Activity {
         if (reset != null) {
             reset.setOnClickListener(view -> resetOptions());
         }
+        View pickNotes = findViewById(R.id.action_pick_notes);
+        if (pickNotes != null) {
+            pickNotes.setOnClickListener(view -> pickNotes());
+        }
+    }
+
+    /**
+     * Opens the tick list of notes.
+     *
+     * <p>The selection lives in the preferences rather than coming back in a
+     * result: the picker is also what the export reads from, so a visit that ends
+     * with the task being killed still counts.
+     */
+    private void pickNotes() {
+        try {
+            startActivity(new Intent(this, PickerActivity.class));
+        } catch (Throwable t) {
+            Log.w(TAG, "could not open the note picker: " + t);
+        }
+    }
+
+    /** Says how many notes the export will cover. */
+    private void refreshSelectedNotes() {
+        if (selectedNotesView == null) {
+            return;
+        }
+        int chosen = NoteSelection.read(this).size();
+        selectedNotesView.setText(chosen == 0
+                ? getString(R.string.notes_all)
+                : getString(R.string.notes_selected, chosen));
     }
 
     private void setStatus(String message, boolean error) {
@@ -486,6 +527,8 @@ public class ConfigActivity extends Activity {
         options.categoryFolders = foldersBox == null || foldersBox.isChecked();
         options.skipExisting = skipBox != null && skipBox.isChecked();
         options.debug = debugBox != null && debugBox.isChecked();
+        // The picker's tick list, which an empty list turns back into "everything".
+        options.guids.addAll(NoteSelection.read(this));
         options.limit = 0;
         if (limitBox != null) {
             try {

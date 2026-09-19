@@ -17,7 +17,9 @@ D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NativeImageExport
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Note.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteExporter.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteHtml.java
+D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteSelection.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteStore.java
+D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\PickerActivity.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\PipelineProbe.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ProgressNotifier.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ShareProbe.java

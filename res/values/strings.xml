@@ -54,6 +54,26 @@
     <string name="status_folder_opened">导出目录：%1$s（已交给文件管理器打开）</string>
     <string name="status_no_file_manager">找不到能打开文件夹的应用，导出目录在：%1$s</string>
 
+    <string name="section_notes">要导出哪些便签</string>
+    <string name="notes_all">全部便签（一条都没勾选时，导出所有便签）</string>
+    <string name="notes_selected">已勾选 %1$d 条便签（其余不导出）</string>
+    <string name="action_pick_notes">选择便签…</string>
+
+    <string name="picker_title">选择要导出的便签</string>
+    <!-- The same words the exported documents use for a note whose title is empty. -->
+    <string name="untitled">无标题</string>
+    <string name="words">字</string>
+    <string name="picker_hint">勾选想导出的便签，然后点「完成」。一条都不勾 = 导出全部。列表由便签应用提供，标题与分类原样照搬。</string>
+    <string name="picker_all">全选</string>
+    <string name="picker_none">全不选</string>
+    <string name="picker_done">完成</string>
+    <string name="picker_loading">正在向便签询问便签列表…（便签没在运行时，第一次可能要几秒）</string>
+    <string name="picker_empty">便签应用里没有可导出的便签。</string>
+    <string name="picker_failed">读不到便签列表。请确认：\n1) 模块已在 LSPosed 中启用，作用域包含「便签」；\n2) 至少冷启动过一次便签应用。</string>
+    <string name="picker_encrypted">（加密便签，导出时跳过）</string>
+    <string name="picker_recycled">（在回收站）</string>
+    <string name="picker_summary">共 %1$d 条便签，已勾选 %2$d 条。</string>
+
     <string name="section_preview">最近一次导出</string>
     <string name="preview_note">导出或「先试 1 条」之后，这里会显示第一张图的顶部，用来核对底色、字色和版式。整张长图太长，只留顶部一截。</string>
 

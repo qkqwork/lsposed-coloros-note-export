@@ -41,6 +41,16 @@ Hook `com.coloros.note`，在**便签进程内部**批量导出全部便签：
   ColorOS 水印，可选 **去掉（默认）/ 去掉文字但保留原高度（留白）/ 换成我自己的文字 / 不动它**。
   水印是应用自己布局的一部分，只能在它画图的过程中处理，所以这一项是 hook 而不是后期裁剪；
   自定义文字保存在设置里，切回该模式仍然在
+- **选择要导出哪些便签**：设置页的「选择便签…」会向便签应用要来一份清单（标题 · 分类 · 字数，
+  加密与回收站中的便签会标出来），勾选后只导出这些；**一条都不勾 = 全部**。选择会被记住，
+  下次导出同一批不用重新勾
+- **先试 1 条 + 预览**：先只跑第 1 条（不记住条数），导出的第一张图的**顶部**会显示在设置页上，
+  用来核对底色、字色与版式——整张长图太长，只留顶部一截，否则一个 binder 回包放不下
+- **长图底色跟随系统主题**：便签自己就是按系统主题画长图的（深色主题下交的是透明纸 + 白字，
+  浅色主题下直接把白纸黑字画进图里），模块跟着同一套配色补底色，**不重绘任何像素**。
+  设置页会把当前主题对应的结果写出来；想换底色，改系统深色模式即可
+- **打开导出目录 / 恢复默认设置**：前者直接跳到 `Download/便签导出/`，后者一键回到推荐选项
+- **选项即改即存**：任何一处改动立刻写入，任务被划掉或进程被杀也不会丢
 
 产物落在 `Download/便签导出/<时间戳>/` 下，**不需要任何存储权限**。
 
@@ -86,38 +96,74 @@ content://com.oneplus.provider.Note/<自定义路径段>
 
 ```
 src/com/qkqwork/noteexport/
-  Main.java                  Xposed 入口：4 个 hook
-  NoteExporter.java          数据库读取 + 遍历 + 落盘编排
-  Note.java                  便签数据模型
+  Main.java                  Xposed 入口：provider 拦截（导出 / 探针 / 诊断 / 便签清单）+ 兜底链路
+  Hooks.java                 反射式 findAndHookMethod（绕开 legacy API 的签名坑）
+  ConfigActivity.java        设置页（XML 布局 + 资源，选项即改即存）
+  PickerActivity.java        便签选择器（向便签应用要清单，勾选后只导出这些）
+  ExportOptions.java         导出选项（格式 / 组织方式 / 底色 / 便签子集 / 限制条数…）
+  ExportRequest.java         选项在进程间的载体（查询串，附带落盘兜底）
+  ConfigProvider.java        模块自己的只读设置 provider
+  ConfigContract.java        两边共享的常量（路径段、列名、取值）
+  NoteSelection.java         勾选的便签（存 id，空 = 全部）
+  NoteExporter.java          数据库读取 + 遍历编排（三种格式的入口与便签子集过滤）
+  NativeBatchExport.java     原版长图：驱动便签自己的 doPictureShare，摞页面、补底色、裁白
+  NativeImageExport.java     原版长图的逐条路径
+  LongImageRenderer.java     模块自绘长图（HTML → WebView → PNG）
   NoteStore.java             便签数据库访问（含旧版本列数退化）
-  HtmlToWord.java            HTML → OOXML 转换器
+  Note.java / Doc.java       数据模型与 OOXML 片段
+  HtmlToWord.java            HTML → WordprocessingML 转换器
   DocxWriter.java            .docx 打包（含图片内嵌）
-  LongImageRenderer.java     HTML → 长图 PNG
-  ExportOptions.java         导出选项
-  ConfigActivity.java        设置 / 一键导出界面
-  ConfigProvider.java        只读设置 provider
-  ConfigContract.java        共享常量
-build.sh                     javac + d8 + aapt2 + apksigner（不依赖 Gradle）
+  NoteHtml.java              便签 raw_text 的整理
+  Thumbnail.java             导出结果顶部的小预览图（骑着回答的 cursor 回传）
+  ExportSink.java            落盘（MediaStore，免存储权限；同名覆写）
+  ProgressNotifier.java      便签应用自己的通知栏进度
+  WatermarkHook.java         分享长图水印的四种处理
+  WatermarkSettings.java     水印设置（provider + 镜像文件）
+  Diagnostics.java           真机诊断报告
+  CaptureProbe / PipelineProbe / ShareProbe.java   调查用的探针（debug=1 时才挂）
+build.ps1                    javac + d8 + aapt2 + apksigner（不依赖 Gradle）
+build/*.py, build/*.sh       调查便签应用与整理产物用的工具脚本
 ```
 
 ## 构建
 
 ```
-build.sh          # Windows: bash build.sh 或见 BUILD.md
+build.ps1        # Windows PowerShell，无需 Gradle、无需 Android Studio
 ```
 
-只需 JDK 17 + 一份 android.jar（脚本会自动下载缺失的构建工具到 `libs/`）。
+需要 **JDK 17**；Android SDK 不必预装——脚本自己下载缺失的
+`android.jar`（platform 35）与 build-tools（aapt2 / d8 / zipalign / apksigner）到 `.buildtools/`，
+签名用的 keystore 也在本地生成。链路是：
+
+```
+aapt2 compile/link  →  javac（stubs + src）  →  d8  →  写入 APK  →  zipalign  →  apksigner
+```
+
+资源先链接、再编译 Java：这样 `R.java` 在 `javac` 之前就存在。
+产物是 `build/NoteExport.apk`（约 300 KB，零第三方依赖，dex 只含模块自己的类）。
+
+`build/` 下的 Python / shell 脚本是调查便签应用时用的工具（找方法名、跑管道、清理产物），
+它们从你自己的便签应用里生成需要的清单，仓库里不附带任何反编译产物。
 
 ## 安装与使用
 
 1. 安装 APK，在 LSPosed 中启用模块，**作用域勾选「便签」**。
 2. 冷启动一次便签（让模块注入）。
-3. 打开模块"ColorOS Note Export"，选格式与组织方式，点"开始导出"。
-4. 结果在 `Download/便签导出/`。
+3. 打开模块「ColorOS Note Export」，选格式与组织方式；需要的话点「选择便签…」勾一批便签。
+4. 建议先点「先试 1 条」，在设置页上核对预览图；满意后点「开始导出」。
+5. 结果在 `Download/便签导出/`（可在设置页点「打开导出目录」直达）。
+
+长图底色由系统主题决定：想让产物是黑底白字，就把手机切到深色模式；浅色模式下便签交出的
+就是白纸黑字的成品图，模块无从改成黑底。
 
 ## 已知限制
 
-- **加密便签不导出**（正文在应用内加密，模块只统计条数）。
+- **加密便签不导出**（正文在应用内加密，模块只统计条数，选择器里会标注并禁止勾选）。
+- **长图底色不能单独切换**：底色跟随系统主题。便签按主题决定自己画什么——深色主题交的是
+  透明纸 + 白字（模块补底色），浅色主题直接把白纸黑字画进图里（底色是图的一部分，改不了）。
+  强行反色只能靠逐像素重绘字色，抗锯齿的字边、照片里的大片同色区域和超过 40 像素的连续
+  平直笔画会留下残影，所以这个选项被去掉了。
+- 预览只有**第一张图的顶部**，用来判断配色与版式，不是完整长图。
 - `com.oneplus.provider.Note` 与 provider 类的对应关系需在真机核实；
   查不到时会自动回退到"待导出标记"链路。
 - 便签升级若改动表名/列名，模块会记录诊断日志并尽量退化查询，不会静默导出空内容。
@@ -131,8 +177,7 @@ build.sh          # Windows: bash build.sh 或见 BUILD.md
   是它先做的（本项目在自己的四种模式里多了一个"不动它"）；
 - 它也记录了那批**属于便签应用自己**的视图名（`color_os_logo.xml` 里的
   `mLogoLinearLayout` / `mLine` / `mWaterMark` / `mShareLogo` / `mShareLogoOriginal`），
-  本项目按这些名字在本机便签 16.6.22 的 dex 里逐个核对后自行实现（见 `HANDOFF.md` 的
-  「先核对，再写码」一节）；
+  本项目按这些名字在本机便签 16.6.22 的 dex 里逐个核对后自行实现——先核对名字，再写代码；
 - 兜底设置文件名 `note_watermark.txt` 沿用了同一约定。
 
 **本项目没有复制它的代码**：它用 Gradle + libxposed API 102 构建，本项目用无 Gradle 的自建编译链

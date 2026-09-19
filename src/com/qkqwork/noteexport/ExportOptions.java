@@ -1,5 +1,8 @@
 package com.qkqwork.noteexport;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** What the user picked in the module's settings screen. */
 public final class ExportOptions {
 
@@ -49,6 +52,15 @@ public final class ExportOptions {
     /** Include notes sitting in the recycle bin. */
     public boolean includeRecycled = true;
 
+    /**
+     * The notes to export, as note ids; empty means every one of them.
+     *
+     * <p>Ticked in the picker, which can only see titles — the ids are what
+     * survives the trip into the Notes process and what the export matches its
+     * notes against.
+     */
+    public final List<String> guids = new ArrayList<>();
+
     /** Export the .docx / .png files into a timestamped subdirectory. */
     public boolean timestampedFolder = true;
 
@@ -82,6 +94,11 @@ public final class ExportOptions {
      * investigated and is only noise the rest of the time.
      */
     public boolean debug;
+
+    /** Whether the picker narrowed this export down to particular notes. */
+    public boolean hasSelection() {
+        return guids != null && !guids.isEmpty();
+    }
 
     public ExportOptions() {
     }

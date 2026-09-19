@@ -34,6 +34,15 @@
         </activity>
 
         <!--
+          The tick list of notes. Not exported: it is only ever opened from the
+          settings screen in this same app.
+        -->
+        <activity
+            android:name=".PickerActivity"
+            android:label="@string/picker_title"
+            android:exported="false" />
+
+        <!--
           Read-only settings surface of the module. The export itself travels in
           a request file, so this provider is only here for introspection and for
           other tooling to see what the module is configured to do.
