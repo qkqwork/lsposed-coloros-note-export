@@ -124,17 +124,39 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 
 ### 提交
 
-1. 打开官方提交页 <https://modules.lsposed.org/submission/>（跳转到
-   [`Xposed-Modules-Repo/submission`](https://github.com/Xposed-Modules-Repo/submission)
-   的一个 issue 表单）。
-2. 按表单填写：**模块包名**（`com.qkqwork.noteexport`）与**源码仓库地址**
-   （`https://github.com/qkqwork/lsposed-coloros-note-export`）。有的版本还会要求填
-   模块名、模块描述、是否已有 release——照着填即可。
-3. 提交后是人工审核，可能会有人来问几个问题（作用域、为什么需要这些权限、在什么设备上验证过）。
-   本项目在这些问题上是有话可说的：**零第三方依赖、只读取便签自己的数据库、不申请任何权限、
+**前提：先有 release。** 机器人只从 release 的附件里取 APK，没有 release 的仓库会被直接打回，
+所以第 3 步（发 `v1.0`）做完再交。
+
+1. 打开官方提交页 <https://modules.lsposed.org/submission/>。
+   它会用 **GitHub 账号登录**（授权后以你的名义建 issue），所以用**仓库所属的那个账号**登录。
+2. 表单基本只要两样：**模块包名** `com.qkqwork.noteexport` 与
+   **源码仓库** `https://github.com/qkqwork/lsposed-coloros-note-export`；
+   有的版本还会要模块名、描述、是否已有 release——描述直接用本文上面那三档里的「一段话」。
+3. 提交后会在 [`Xposed-Modules-Repo/submission`](https://github.com/Xposed-Modules-Repo/submission)
+   里生成一个 issue，等维护者人工过。可能会被问作用域/权限/验证环境，本项目的现成答案：
+   **不申请任何权限、只读便签自己的数据库、零第三方依赖（不含 AndroidX/Material）、
    在 PKR110 / Android 16 / 便签 16.6.22 上逐项真机验证过**。
-4. 通过后官方会创建 `Xposed-Modules-Repo/com.qkqwork.noteexport`，机器人把 release 同步进去，
-   模块就出现在 LSPosed 管理器的仓库列表里，可以直接安装。
+4. 通过后官方会建 `Xposed-Modules-Repo/com.qkqwork.noteexport`，机器人把最新 release 同步进去
+   （APK + 从清单读到的名称/描述/版本），模块就会出现在 LSPosed 管理器的模块仓库里。
+
+**表单打不开 / 提交失败时的备用做法**：直接在
+<https://github.com/Xposed-Modules-Repo/submission/issues/new/choose> 选模块提交的模板，
+把下面这段填进去提交（字段名照模板，内容照抄）：
+
+```
+模块名称：ColorOS Note Export
+模块包名：com.qkqwork.noteexport
+源码仓库：https://github.com/qkqwork/lsposed-coloros-note-export
+License：GPL-3.0（开源）
+作用域：com.coloros.note（便签）
+模块描述：<粘贴本文「一段话」那一版>
+已发布版本：v1.0（APK 在 release 附件里）
+已验证环境：ColorOS 16 / Android 16（API 36）/ 便签 16.6.22
+```
+
+**常被打回的原因**（对照自查，本项目都已满足）：仓库私有或没有 LICENSE；
+release 里没有 APK 附件；清单里缺 `xposedmodule` / `xposedminversion`；
+作用域写得比实际需要大；描述看不出这个模块到底干什么。
 
 ### 之后怎么更新
 
