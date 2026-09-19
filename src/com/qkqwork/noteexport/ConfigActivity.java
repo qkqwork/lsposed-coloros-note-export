@@ -258,6 +258,10 @@ public class ConfigActivity extends Activity {
         if (reset != null) {
             reset.setOnClickListener(view -> resetOptions());
         }
+        View backup = findViewById(R.id.action_backup);
+        if (backup != null) {
+            backup.setOnClickListener(view -> startBackup());
+        }
         View pickNotes = findViewById(R.id.action_pick_notes);
         if (pickNotes != null) {
             pickNotes.setOnClickListener(view -> pickNotes());
@@ -934,6 +938,61 @@ public class ConfigActivity extends Activity {
         limitBeforeTrial = null;
     }
 
+    /**
+     * Asks the Notes process to pack the notebook into a zip.
+     *
+     * <p>Unlike an export this needs nothing of the Notes app's screens: the zip
+     * is built from files the Notes process can read wherever it happens to be.
+     * So the ask goes straight out, and the progress shown is the same progress
+     * an export reports — the same endpoints answer it.
+     */
+    private void startBackup() {
+        if (!running.compareAndSet(false, true)) {
+            return;
+        }
+        saveOptions();
+        setStatus(getString(R.string.status_backup_asking), false);
+        if (cancelButton != null) {
+            cancelButton.setText(R.string.action_cancel_backup);
+        }
+        progressStartedAt = 0;
+        progressStartedDone = 0;
+        setExporting(true);
+        handler.removeCallbacks(progressPoll);
+        handler.post(progressPoll);
+
+        new Thread(() -> {
+            String message = null;
+            boolean ok = false;
+            for (String authority : ConfigContract.NOTES_AUTHORITIES) {
+                Cursor cursor = null;
+                try {
+                    Log.i(TAG, "asking " + authority + " for a backup");
+                    cursor = getContentResolver().query(
+                            ConfigContract.backupUri(authority), null, null, null, null);
+                    if (cursor == null || !cursor.moveToFirst()) {
+                        continue;
+                    }
+                    int okColumn = cursor.getColumnIndex("ok");
+                    int messageColumn = cursor.getColumnIndex("message");
+                    int pathColumn = cursor.getColumnIndex("path");
+                    ok = okColumn >= 0 && cursor.getInt(okColumn) != 0;
+                    message = messageColumn >= 0 ? cursor.getString(messageColumn) : null;
+                    String path = pathColumn >= 0 ? cursor.getString(pathColumn) : null;
+                    if (ok && !TextUtils.isEmpty(path) && TextUtils.isEmpty(message)) {
+                        message = "备份完成\n位置：" + path;
+                    }
+                    break;
+                } catch (Throwable t) {
+                    Log.w(TAG, "backup query to " + authority + " failed: " + t);
+                } finally {
+                    closeQuietly(cursor);
+                }
+            }
+            publish(message, ok, null);
+        }, "note-backup").start();
+    }
+
     private void startExport() {
         if (!running.compareAndSet(false, true)) {
             return;
@@ -942,6 +1001,9 @@ public class ConfigActivity extends Activity {
         // text typed and then exported straight away would otherwise leave with
         // the value from the last time something else was tapped.
         saveOptions();
+        if (cancelButton != null) {
+            cancelButton.setText(R.string.action_cancel);
+        }
         ExportOptions options = readOptions();
         // The options travel in the query itself. Writing them to a file in
         // Downloads used to look simpler, but this module holds no storage

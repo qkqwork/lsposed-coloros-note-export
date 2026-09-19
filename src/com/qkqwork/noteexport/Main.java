@@ -258,6 +258,12 @@ public class Main implements IXposedHookLoadPackage {
                                 method.setResult(cancelCursor(context));
                                 return;
                             }
+                            if (ConfigContract.BACKUP_SEGMENT.equals(segment)) {
+                                Context context = ((ContentProvider) method.thisObject)
+                                        .getContext();
+                                method.setResult(runBackup(context));
+                                return;
+                            }
                             if (!ConfigContract.EXPORT_SEGMENT.equals(segment)) {
                                 return;
                             }
@@ -357,6 +363,38 @@ public class Main implements IXposedHookLoadPackage {
             } catch (Throwable t) {
                 Log.e(TAG, "export threw", t);
                 return answer(false, "导出失败：" + t, "");
+            } finally {
+                exportRunning = false;
+            }
+        }
+    }
+
+    /**
+     * Packs the notebook into a zip, for the settings screen's backup button.
+     *
+     * <p>Same caller check as an export, and the same running flag: a backup and
+     * an export both read the whole notebook, and one at a time is enough for a
+     * phone.
+     */
+    private static Cursor runBackup(Context context) {
+        if (context == null) {
+            return answer(false, "备份失败：没有可用的便签上下文", "");
+        }
+        if (!callerAllowed(context)) {
+            Log.w(TAG, "refusing a backup request from uid " + Binder.getCallingUid());
+            return answer(false, "备份被拒绝：调用方不是本模块", "");
+        }
+        synchronized (Main.class) {
+            if (exportRunning) {
+                return answer(false, "已有任务在进行中（导出或备份），请等它结束", "");
+            }
+            exportRunning = true;
+            try {
+                NoteExporter.Result result = NoteBackup.run(context);
+                return answer(result.ok, result.message, result.path, null);
+            } catch (Throwable t) {
+                Log.e(TAG, "backup threw", t);
+                return answer(false, "备份失败：" + t, "");
             } finally {
                 exportRunning = false;
             }

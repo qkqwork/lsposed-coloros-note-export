@@ -70,6 +70,15 @@ public final class ConfigContract {
     public static final String CANCEL_SEGMENT = "note_dsh_cancel";
 
     /**
+     * Packs the whole notebook — database and attachments — into one zip.
+     *
+     * <p>Answered with the same {@link #EXPORT_COLUMNS} shape as an export: the
+     * message carries the folder the zip landed in and the paths a manual
+     * restore has to copy back to.
+     */
+    public static final String BACKUP_SEGMENT = "note_dsh_backup";
+
+    /**
      * Columns of the progress answer.
      *
      * <p>{@code cancel} says whether a stop has been asked for, so the screen can
@@ -109,6 +118,10 @@ public final class ConfigContract {
 
     public static Uri cancelUri(String authority) {
         return Uri.parse("content://" + authority + "/" + CANCEL_SEGMENT);
+    }
+
+    public static Uri backupUri(String authority) {
+        return Uri.parse("content://" + authority + "/" + BACKUP_SEGMENT);
     }
 
     // ------------------------------------------------------- module settings

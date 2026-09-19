@@ -45,6 +45,7 @@
 
     <string name="action_export">开始导出</string>
     <string name="action_cancel">取消导出</string>
+    <string name="action_cancel_backup">取消备份</string>
     <string name="action_cancel_asked">已请求取消：正在画的那一条会画完，之后就停。</string>
     <string name="status_progress">正在导出 %1$d / %2$d%3$s%4$s</string>
     <string name="status_progress_eta">（约剩 %1$s）</string>
@@ -88,7 +89,15 @@
     <string name="picker_recycled">（在回收站）</string>
     <string name="picker_summary">共 %1$d 条便签，已勾选 %2$d 条。</string>
 
+    <string name="section_backup">整本备份（zip）</string>
+    <string name="backup_note">把便签的数据库、附件与应用设置打包成一个 zip，放到导出目录。不提供恢复功能：恢复要用 root 或 adb，把包里的 databases/、files/、shared_prefs/、no_backup/ 拷回便签应用的数据目录——完整路径与命令写在包内「备份说明.txt」里。\n目标目录：\n· 数据库 → /data/data/com.coloros.note/databases/nearme_note.db\n· 附件 → /data/data/com.coloros.note/files/&lt;便签 id&gt;/…\n恢复前先 am force-stop com.coloros.note，并先把现有目录改名留一份。</string>
+    <string name="action_backup">备份全部便签（zip）</string>
+    <string name="status_backup_asking">正在通知便签打包备份…（数据多时需要几分钟）</string>
+    <string name="status_backup_done">备份完成</string>
+    <string name="status_backup_cancelled">备份已取消</string>
+
     <string name="section_preview">最近一次导出</string>
+
     <string name="preview_note">导出或「先试 1 条」之后，这里会显示第一张图的顶部，用来核对底色、字色和版式。整张长图太长，只留顶部一截。</string>
 
     <string name="section_about">关于</string>

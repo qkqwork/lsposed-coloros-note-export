@@ -365,6 +365,25 @@
             style="@style/NoteExport.Section"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="@string/section_backup" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/backup_note" />
+
+        <Button
+            android:id="@+id/action_backup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:text="@string/action_backup" />
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="@string/section_preview" />
 
         <TextView

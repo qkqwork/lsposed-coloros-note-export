@@ -88,6 +88,39 @@ public final class NoteStore {
     }
 
     /**
+     * How many notes the database holds.
+     *
+     * <p>For the backup's summary line: the whole database is being copied
+     * either way, so this only has to be right, not fast — and counting rows is
+     * far cheaper than reading every body to find out.
+     */
+    public static int noteCount(Context context) {
+        File dbFile = context.getDatabasePath(DB_NAME);
+        if (!dbFile.isFile()) {
+            return 0;
+        }
+        SQLiteDatabase db = null;
+        Cursor cursor = null;
+        try {
+            db = openReadable(dbFile);
+            cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_NOTES, null);
+            return cursor.moveToFirst() ? cursor.getInt(0) : 0;
+        } catch (Throwable t) {
+            Log.w(TAG, "could not count the notes: " + t);
+            return 0;
+        } finally {
+            close(cursor);
+            if (db != null) {
+                try {
+                    db.close();
+                } catch (Throwable ignored) {
+                    // nothing useful to do
+                }
+            }
+        }
+    }
+
+    /**
      * The database is in WAL mode; read-only is the right intent, but if that
      * combination is refused, the Notes process is entitled to open it writable
      * anyway. Only SELECTs are ever issued either way.
