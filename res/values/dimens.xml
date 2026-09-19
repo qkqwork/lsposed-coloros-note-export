@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="screen_padding">20dp</dimen>
+    <dimen name="section_top_margin">20dp</dimen>
+    <dimen name="inner_top_margin">16dp</dimen>
+    <dimen name="item_spacing">2dp</dimen>
+    <dimen name="card_radius">16dp</dimen>
+    <dimen name="card_padding">14dp</dimen>
+    <dimen name="title_text">22sp</dimen>
+    <dimen name="section_text">15sp</dimen>
+    <dimen name="body_text">14sp</dimen>
+    <dimen name="hint_text">13sp</dimen>
+    <dimen name="thumbnail_max_height">280dp</dimen>
+</resources>

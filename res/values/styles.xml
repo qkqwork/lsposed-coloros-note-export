@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The few styles the settings screen uses, so a widget's look is decided once
+    here instead of in Java. Everything is a framework style with a colour or a
+    size changed: this module carries no third party library on purpose, because
+    its code is injected into the Notes app, which has its own copies of
+    AndroidX and Material.
+-->
+<resources>
+    <!-- The dotted names below inherit from this one: a style called A.B is
+         taken to be a child of A, so A has to exist even though it is empty. -->
+    <style name="NoteExport" />
+
+    <style name="NoteExport.Title">
+        <item name="android:textSize">@dimen/title_text</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/body_text</item>
+    </style>
+
+    <style name="NoteExport.Section">
+        <item name="android:textSize">@dimen/section_text</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/section_text</item>
+        <item name="android:layout_marginTop">@dimen/section_top_margin</item>
+    </style>
+
+    <style name="NoteExport.Hint">
+        <item name="android:textSize">@dimen/hint_text</item>
+        <item name="android:textColor">@color/hint_text</item>
+        <item name="android:lineSpacingMultiplier">1.15</item>
+    </style>
+
+    <style name="NoteExport.Option">
+        <item name="android:textSize">@dimen/body_text</item>
+        <item name="android:textColor">@color/body_text</item>
+        <item name="android:paddingTop">@dimen/item_spacing</item>
+        <item name="android:paddingBottom">@dimen/item_spacing</item>
+    </style>
+
+    <style name="NoteExport.Status">
+        <item name="android:textSize">@dimen/body_text</item>
+        <item name="android:textColor">@color/body_text</item>
+        <item name="android:textIsSelectable">true</item>
+        <item name="android:background">@drawable/card_background</item>
+        <item name="android:padding">@dimen/card_padding</item>
+        <item name="android:layout_marginTop">@dimen/inner_top_margin</item>
+    </style>
+</resources>

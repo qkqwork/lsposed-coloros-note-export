@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The settings screen. It is one scrolling form: what to export, how to name it,
+    and what to do about the watermark the Notes app stamps on a shared picture.
+
+    The option radio buttons carry numbers as their ids when the screen starts
+    (see ConfigActivity.bindViews): the ids double as the values the screen
+    persists, and the code that reads them predates this layout. The layouts below
+    and in values-night give the whole form its colours.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/screen_background"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="@dimen/screen_padding">
+
+        <TextView
+            style="@style/NoteExport.Title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:text="@string/screen_subtitle" />
+
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_format" />
+
+        <RadioGroup
+            android:id="@+id/format_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/format_word"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/format_word" />
+
+            <RadioButton
+                android:id="@+id/format_native"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/format_native" />
+
+            <RadioButton
+                android:id="@+id/format_drawn"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/format_drawn" />
+        </RadioGroup>
+
+        <LinearLayout
+            android:id="@+id/word_options"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                style="@style/NoteExport.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/section_word_layout" />
+
+            <RadioGroup
+                android:id="@+id/layout_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <RadioButton
+                    android:id="@+id/layout_single"
+                    style="@style/NoteExport.Option"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/layout_single" />
+
+                <RadioButton
+                    android:id="@+id/layout_per_note"
+                    style="@style/NoteExport.Option"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/layout_per_note" />
+            </RadioGroup>
+        </LinearLayout>
+
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_options" />
+
+        <CheckBox
+            android:id="@+id/option_recycled"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_recycled" />
+
+        <EditText
+            android:id="@+id/option_limit"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/option_limit_hint"
+            android:inputType="number"
+            android:maxLines="1" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_limit_note" />
+
+        <CheckBox
+            android:id="@+id/option_numbered"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_numbered" />
+
+        <CheckBox
+            android:id="@+id/option_folders"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_folders" />
+
+        <CheckBox
+            android:id="@+id/option_stamped"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_stamped" />
+
+        <CheckBox
+            android:id="@+id/option_skip"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_skip" />
+
+        <CheckBox
+            android:id="@+id/option_debug"
+            style="@style/NoteExport.Option"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_debug" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/option_debug_note" />
+
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_background" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/background_note" />
+
+        <RadioGroup
+            android:id="@+id/background_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/background_dark"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/background_dark" />
+
+            <RadioButton
+                android:id="@+id/background_white"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/background_white" />
+
+            <RadioButton
+                android:id="@+id/background_auto"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/background_auto" />
+        </RadioGroup>
+
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_watermark" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/watermark_note" />
+
+        <RadioGroup
+            android:id="@+id/watermark_group"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <RadioButton
+                android:id="@+id/watermark_remove"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/watermark_remove" />
+
+            <RadioButton
+                android:id="@+id/watermark_space"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/watermark_space" />
+
+            <RadioButton
+                android:id="@+id/watermark_custom"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/watermark_custom" />
+
+            <RadioButton
+                android:id="@+id/watermark_keep"
+                style="@style/NoteExport.Option"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/watermark_keep" />
+        </RadioGroup>
+
+        <EditText
+            android:id="@+id/watermark_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="@string/watermark_text_hint"
+            android:maxLines="1" />
+
+
+        <Button
+            android:id="@+id/action_export"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/inner_top_margin"
+            android:text="@string/action_export" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/action_open_folder"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/action_open_folder" />
+
+            <Button
+                android:id="@+id/action_reset"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/item_spacing"
+                android:layout_weight="1"
+                android:text="@string/action_reset" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/status"
+            style="@style/NoteExport.Status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/status_idle" />
+    </LinearLayout>
+</ScrollView>

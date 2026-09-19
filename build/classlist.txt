@@ -128,6 +128,15 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\NoteSto
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PipelineProbe$Tracer.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\PipelineProbe.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ProgressNotifier.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$color.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$dimen.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$drawable.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$id.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$layout.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$mipmap.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$string.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R$style.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\R.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe$1.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe$3.class

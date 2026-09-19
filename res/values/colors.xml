@@ -1,4 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Colours for the light theme. The screen is a plain settings form, so it keeps
+    to the framework's own palette where it can: these are only the few places
+    that need a colour of their own — the page behind the form, the section
+    headings, the hints and the two states of the result line. values-night holds
+    the dark equivalents, which is what keeps the screen readable when the phone
+    is in its dark theme.
+-->
 <resources>
     <color name="ic_launcher_background">#0D746C</color>
+
+    <color name="screen_background">#FFF7F7F7</color>
+    <color name="card_background">#FFFFFFFF</color>
+    <color name="section_text">#FF1565C0</color>
+    <color name="body_text">#FF1B1B1B</color>
+    <color name="hint_text">#FF6B6B6B</color>
+    <color name="ok_text">#FF1B5E20</color>
+    <color name="error_text">#FFB00020</color>
+    <color name="note_background">#FFFFF7E0</color>
 </resources>

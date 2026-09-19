@@ -227,9 +227,35 @@ Write-Info "$($sources.Count) source files"
 
 # -Xlint:-deprecation silences javac's "uses a deprecated API" note, which
 # would otherwise land on stderr and, once redirected, abort the build.
+#
+# aapt2 link is what writes R.java, and the settings screen refers to it, so the
+# resources are linked once here, before javac, with the generated sources on the
+# source path. The APK this writes is a throwaway: step 5 links again, into the
+# APK that is actually signed.
+$genDir = Join-Path $out 'gen'
+if (Test-Path $genDir) { Remove-Item $genDir -Recurse -Force }
+$earlyFlat = Join-Path $out 'res-flat'
+if (Test-Path $earlyFlat) { Remove-Item $earlyFlat -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $earlyFlat | Out-Null
+$resDir = Join-Path $root 'res'
+if (Test-Path $resDir) {
+    & $aapt2 compile --dir $resDir -o $earlyFlat
+    if ($LASTEXITCODE -ne 0) { Fail 'aapt2 compile failed' }
+}
+$earlyArgs = @('link', '-o', (Join-Path $out 'module.early.apk'),
+    '--manifest', (Join-Path $root 'AndroidManifest.xml'),
+    '-I', $androidJar,
+    '--java', $genDir,
+    '--min-sdk-version', '29',
+    '--target-sdk-version', '34')
+$earlyFiles = Get-ChildItem $earlyFlat -Filter '*.flat' -ErrorAction SilentlyContinue
+if ($earlyFiles) { $earlyArgs += $earlyFiles.FullName }
+& $aapt2 @earlyArgs
+if ($LASTEXITCODE -ne 0) { Fail 'aapt2 link failed while generating R.java' }
+
 $javacLog = Join-Path $out 'javac.log'
 $ErrorActionPreference = 'Continue'
-& $javac -classpath $androidJar -source 8 -target 8 -encoding UTF-8 -nowarn `
+& $javac -classpath $androidJar -sourcepath $genDir -source 8 -target 8 -encoding UTF-8 -nowarn `
     -Xlint:-deprecation -d $classes "@$sourcesFile" *> $javacLog
 $compileExit = $LASTEXITCODE
 $ErrorActionPreference = 'Stop'

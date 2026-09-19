@@ -1,6 +1,49 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Shown as the module's name in LSPosed and in the launcher. ConfigActivity
-         puts the same words in its own title, and says so there. -->
+         uses the same words as its screen title. -->
     <string name="app_name">ColorOS Note Export</string>
+    <string name="screen_subtitle">在 LSPosed 中启用本模块，作用域勾选「便签」，然后冷启动一次便签应用。</string>
+
+    <string name="section_format">导出为</string>
+    <string name="format_word">Word 文档（.docx）</string>
+    <string name="format_native">原版长图（便签应用自己渲染，推荐）</string>
+    <string name="format_drawn">长图（模块绘制，版式与便签不同）</string>
+
+    <string name="section_word_layout">Word 组织方式</string>
+    <string name="layout_single">一个汇总文档（全部分类在一个 .docx 内）</string>
+    <string name="layout_per_note">每条便签一个文档（按分类分文件夹）</string>
+
+    <string name="section_options">选项</string>
+    <string name="option_recycled">包含回收站中的便签</string>
+    <string name="option_limit_hint">导出条数（0 或留空 = 全部）</string>
+    <string name="option_limit_note">先用 1–2 条试格式，确认满意再跑全部。</string>
+    <string name="option_numbered">文件名带序号（001_标题.png，顺序与便签一致）</string>
+    <string name="option_folders">按分类分文件夹</string>
+    <string name="option_stamped">每次导出放到新的时间戳文件夹</string>
+    <string name="option_skip">跳过已存在的文件（配合上面取消勾选，可接着上次继续导出）</string>
+    <string name="option_debug">开启调试日志（详细诊断，导出很多次都不用开）</string>
+    <string name="option_debug_note">调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，只在排查问题时勾选。</string>
+
+    <string name="section_background">长图底色</string>
+    <string name="background_note">便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。「黑底白字」是应用自己导出时的样子（默认）；「白底」会把白字重画成黑字；「自动」按便签的字色选，若你把系统切成浅色主题、字变黑了，自动就会给白底。注意：白底或黑底与照片里的大片同色区域无法区分，那一块会融进底色。</string>
+    <string name="background_dark">一律黑底白字（默认）</string>
+    <string name="background_white">一律白底（白字自动转黑）</string>
+    <string name="background_auto">自动（跟着便签的字色，浅色主题下自动白底）</string>
+
+    <string name="section_watermark">分享长图的水印</string>
+    <string name="watermark_note">便签自己「分享为图片」时，长图底部会带 ColorOS 水印。这里决定怎么处理它 —— 这一项在便签应用里生效，导出产物不涉及水印。</string>
+    <string name="watermark_remove">去掉水印（推荐）</string>
+    <string name="watermark_space">去掉文字但保留原高度（底部留白）</string>
+    <string name="watermark_custom">换成我自己的文字</string>
+    <string name="watermark_keep">不动它</string>
+    <string name="watermark_text_hint">自定义文字，例如自己的昵称</string>
+
+    <string name="action_export">开始导出</string>
+    <string name="action_open_folder">打开导出目录</string>
+    <string name="action_reset">恢复默认设置</string>
+    <string name="status_idle">准备就绪：选好格式后点「开始导出」。</string>
+    <string name="status_no_file_manager">找不到能打开文件夹的应用，导出目录在：Download/便签导出</string>
+
+    <string name="content_description_thumbnail">最近一次导出的缩略图</string>
 </resources>
