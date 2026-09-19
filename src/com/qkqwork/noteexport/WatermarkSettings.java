@@ -133,11 +133,22 @@ final class WatermarkSettings {
                 ? ConfigContract.WATERMARK_REMOVE : mode;
         String safeText = text == null ? "" : text;
         if (context != null) {
-            context.getSharedPreferences(ConfigContract.PREFS, Context.MODE_PRIVATE)
-                    .edit()
+            android.content.SharedPreferences prefs =
+                    context.getSharedPreferences(ConfigContract.PREFS, Context.MODE_PRIVATE);
+            boolean unchanged = safeMode.equals(
+                    prefs.getString(ConfigContract.COLUMN_WATERMARK_MODE, null))
+                    && safeText.equals(
+                            prefs.getString(ConfigContract.COLUMN_WATERMARK_TEXT, null));
+            prefs.edit()
                     .putString(ConfigContract.COLUMN_WATERMARK_MODE, safeMode)
                     .putString(ConfigContract.COLUMN_WATERMARK_TEXT, safeText)
                     .apply();
+            if (unchanged) {
+                // The screen saves after every tap, and this mirror is a file in
+                // the user's Downloads folder: it is only worth writing when the
+                // watermark itself changed.
+                return;
+            }
         }
 
         Properties properties = new Properties();
@@ -155,7 +166,7 @@ final class WatermarkSettings {
         if (context != null) {
             ExportSink sink = null;
             try {
-                sink = ExportSink.open(context, ExportRequest.DIR,
+                sink = ExportSink.replace(context, ExportRequest.DIR,
                         ConfigContract.WATERMARK_FILE, "text/plain");
                 sink.stream().write(body);
                 sink.finish();

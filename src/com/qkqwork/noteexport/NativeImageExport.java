@@ -198,6 +198,7 @@ final class NativeImageExport {
         }
 
         int index = 0;
+        byte[] preview = null;
         for (Note note : notes) {
             index++;
             String category = NoteExporter.categoryOf(note);
@@ -220,6 +221,11 @@ final class NativeImageExport {
                     sink.finish();
                     stats.files++;
                     stats.notes++;
+                    if (preview == null) {
+                        // Kept so the settings screen can show what came out
+                        // without being able to read the export folder.
+                        preview = Thumbnail.of(picture);
+                    }
                     Log.i(TAG, "native: saved " + sink.path() + " ("
                             + picture.getWidth() + "x" + picture.getHeight() + ")");
                 } else {
@@ -247,7 +253,7 @@ final class NativeImageExport {
         if (stats.failed > 0) {
             message += "（" + stats.failed + " 条失败）";
         }
-        return new NoteExporter.Result(stats.notes > 0, message, root);
+        return new NoteExporter.Result(stats.notes > 0, message, root, preview);
     }
 
     /**

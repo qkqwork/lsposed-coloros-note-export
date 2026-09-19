@@ -1,29 +1,36 @@
 package com.qkqwork.noteexport;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
-import android.graphics.Color;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.DocumentsContract;
+import android.text.Editable;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.util.Log;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
 import android.widget.RadioGroup;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -33,32 +40,63 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * database from its own process, so it does not pretend to know what will be
  * exported. It hands the request to the Notes process and reports what came
  * back.
+ *
+ * <p>The form itself lives in {@code res/layout/activity_config.xml}; this class
+ * only looks the controls up and wires them to the export. Every option is saved
+ * the moment it changes rather than when the screen goes away: a settings screen
+ * that forgets what was chosen because the task was swiped from the recents list
+ * is worse than one that writes a few bytes on every tap.
  */
 public class ConfigActivity extends Activity {
 
     private static final String TAG = Main.TAG;
 
+    /** The folder the exports land in, as a documents-provider uri. */
+    private static final String DOWNLOAD_DOCUMENT =
+            "content://com.android.externalstorage.documents/document/primary%3ADownload";
+    private static final String DOWNLOAD_ROOT =
+            "content://com.android.externalstorage.documents/root/primary";
+    private static final String DIRECTORY_MIME = "vnd.android.document/directory";
+    private static final String ROOT_MIME = "vnd.android.document/root";
+
     private RadioGroup formatGroup;
     private RadioGroup layoutGroup;
-    private CheckBox recycledBox;
-    private TextView statusView;
-    private Button exportButton;
     private LinearLayout layoutOptions;
-    private RadioGroup watermarkGroup;
-    private EditText watermarkText;
-    /** What a long picture is drawn on: automatic, always white or always dark. */
-    private RadioGroup backgroundGroup;
-    /** How many notes to export, and how the files are named. */
+    private CheckBox recycledBox;
     private EditText limitBox;
     private CheckBox numberedBox;
     private CheckBox foldersBox;
     private CheckBox stampedBox;
     private CheckBox skipBox;
     private CheckBox debugBox;
+    /**
+     * States which background the long pictures will get.
+     *
+     * <p>It is not a choice: the Notes app draws its pictures in the colours of
+     * the phone's theme, so the module follows that same theme instead of
+     * repainting glyphs to suit a colour the user picked. Changing the phone's
+     * dark mode is the only thing that moves it.
+     */
+    private TextView backgroundValue;
+    private RadioGroup watermarkGroup;
+    private EditText watermarkText;
+    private Button exportButton;
+    private TextView statusView;
+    /** The top of the first picture of the last export, once there is one. */
+    private ImageView previewView;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final AtomicBoolean running = new AtomicBoolean(false);
     private int attemptsLeft;
+    /**
+     * True while the screen is filling itself in from the stored options.
+     *
+     * <p>Setting a radio button or a check box fires its listener, and those
+     * listeners save: without this the screen would write half-restored values
+     * back over the ones it is still reading — the count field, for instance,
+     * is restored after the format group and would be saved as empty first.
+     */
+    private boolean restoring;
     /**
      * The count field's text while a "try one note" run is in flight.
      *
@@ -74,184 +112,189 @@ public class ConfigActivity extends Activity {
         bindViews();
         restoreOptions();
         refreshLayoutVisibility();
+        restorePreview();
     }
 
     // ------------------------------------------------------------------ the UI
 
-    private View buildUi() {
-        int pad = dp(20);
+    /**
+     * Looks the screen's controls up and wires them together.
+     *
+     * <p>Everything is found first and only then are the listeners attached: a
+     * radio button's listener fires the moment its checked state is set, and a
+     * listener that touched a view that did not exist yet is exactly how this
+     * screen used to crash on start-up.
+     */
+    private void bindViews() {
+        formatGroup = findViewById(R.id.format_group);
+        layoutGroup = findViewById(R.id.layout_group);
+        layoutOptions = findViewById(R.id.word_options);
+        recycledBox = findViewById(R.id.option_recycled);
+        limitBox = findViewById(R.id.option_limit);
+        numberedBox = findViewById(R.id.option_numbered);
+        foldersBox = findViewById(R.id.option_folders);
+        stampedBox = findViewById(R.id.option_stamped);
+        skipBox = findViewById(R.id.option_skip);
+        debugBox = findViewById(R.id.option_debug);
+        backgroundValue = findViewById(R.id.background_value);
+        watermarkGroup = findViewById(R.id.watermark_group);
+        watermarkText = findViewById(R.id.watermark_text);
+        exportButton = findViewById(R.id.action_export);
+        statusView = findViewById(R.id.status);
+        previewView = findViewById(R.id.preview);
 
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
+        if (formatGroup != null) {
+            formatGroup.setOnCheckedChangeListener((group, checked) -> {
+                refreshLayoutVisibility();
+                saveOptions();
+            });
+        }
+        if (layoutGroup != null) {
+            layoutGroup.setOnCheckedChangeListener((group, checked) -> saveOptions());
+        }
+        if (watermarkGroup != null) {
+            watermarkGroup.setOnCheckedChangeListener((group, checked) -> {
+                refreshWatermarkField();
+                saveOptions();
+            });
+        }
+        CompoundButton.OnCheckedChangeListener saver = (button, checked) -> saveOptions();
+        for (CheckBox box : new CheckBox[]{recycledBox, numberedBox, foldersBox,
+                stampedBox, skipBox, debugBox}) {
+            if (box != null) {
+                box.setOnCheckedChangeListener(saver);
+            }
+        }
+        if (limitBox != null) {
+            limitBox.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+                    // nothing to do before the text changes
+                }
 
-        // Kept in step with app_name in res/values/strings.xml by hand: that is
-        // the name LSPosed and the launcher show, and this is the same words on
-        // the screen it opens.
-        root.addView(title("ColorOS Note Export"));
-        root.addView(hint("在 LSPosed 中启用本模块，作用域勾选「便签」，"
-                + "然后冷启动一次便签应用。"));
+                @Override
+                public void onTextChanged(CharSequence text, int start, int before, int count) {
+                    // and nothing to do while it is changing
+                }
 
-        root.addView(section("导出为"));
-        formatGroup = new RadioGroup(this);
-        RadioButton word = radio("Word 文档（.docx）", 1);
-        RadioButton nativeImage = radio("原版长图（便签应用自己渲染，推荐）", 2);
-        RadioButton drawnImage = radio("长图（模块绘制，版式与便签不同）", 3);        formatGroup.addView(word);
-        formatGroup.addView(nativeImage);
-        formatGroup.addView(drawnImage);
-        root.addView(formatGroup);
-
-        layoutOptions = new LinearLayout(this);
-        layoutOptions.setOrientation(LinearLayout.VERTICAL);
-        layoutOptions.addView(section("Word 组织方式"));
-        layoutGroup = new RadioGroup(this);
-        RadioButton single = radio("一个汇总文档（全部分类在一个 .docx 内）", 1);
-        RadioButton perNote = radio("每条便签一个文档（按分类分文件夹）", 2);
-        layoutGroup.addView(single);
-        layoutGroup.addView(perNote);
-        single.setChecked(true);
-        layoutOptions.addView(layoutGroup);
-        root.addView(layoutOptions);
-
-        root.addView(section("选项"));
-        recycledBox = new CheckBox(this);
-        recycledBox.setText("包含回收站中的便签");
-        recycledBox.setChecked(true);
-        root.addView(recycledBox);
-
-        limitBox = new EditText(this);
-        limitBox.setHint("导出条数（0 或留空 = 全部）");
-        limitBox.setSingleLine(true);
-        limitBox.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        root.addView(limitBox);
-        root.addView(hint("先用 1–2 条试格式，确认满意再跑全部。"));
-
-        numberedBox = new CheckBox(this);
-        numberedBox.setText("文件名带序号（001_标题.png，顺序与便签一致）");
-        numberedBox.setChecked(true);
-        root.addView(numberedBox);
-
-        foldersBox = new CheckBox(this);
-        foldersBox.setText("按分类分文件夹");
-        foldersBox.setChecked(true);
-        root.addView(foldersBox);
-
-        stampedBox = new CheckBox(this);
-        stampedBox.setText("每次导出放到新的时间戳文件夹");
-        stampedBox.setChecked(true);
-        root.addView(stampedBox);
-
-        skipBox = new CheckBox(this);
-        skipBox.setText("跳过已存在的文件（配合上面取消勾选，可接着上次继续导出）");
-        root.addView(skipBox);
-
-        debugBox = new CheckBox(this);
-        debugBox.setText("开启调试日志（详细诊断，导出很多次都不用开）");
-        root.addView(debugBox);
-        root.addView(hint("调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，"
-                + "只在排查问题时勾选。"));
-
-        root.addView(section("长图底色"));
-        root.addView(hint("便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。"
-                + "「黑底白字」是应用自己导出时的样子（默认）；「白底」会把白字重画成黑字；"
-                + "「自动」按便签的字色选，若你把系统切成浅色主题、字变黑了，自动就会给白底。"
-                + "注意：白底或黑底与照片里的大片同色区域无法区分，那一块会融进底色。"));
-        backgroundGroup = new RadioGroup(this);
-        RadioButton darkBackground = radio("一律黑底白字（默认）", 3);
-        RadioButton whiteBackground = radio("一律白底（白字自动转黑）", 2);
-        RadioButton autoBackground = radio("自动（跟着便签的字色，浅色主题下自动白底）", 1);
-        backgroundGroup.addView(darkBackground);
-        backgroundGroup.addView(whiteBackground);
-        backgroundGroup.addView(autoBackground);
-        darkBackground.setChecked(true);
-        root.addView(backgroundGroup);
-
-        // ------------------------------------------------------- the watermark
-
-        root.addView(section("分享长图的水印"));
-        root.addView(hint("便签自己「分享为图片」时，长图底部会带 ColorOS 水印。"
-                + "这里决定怎么处理它 —— 这一项在便签应用里生效，导出产物不涉及水印。"));
-
-        watermarkGroup = new RadioGroup(this);
-        RadioButton removeWatermark = watermarkRadio("去掉水印（推荐）", 1);
-        RadioButton keepSpace = watermarkRadio("去掉文字但保留原高度（底部留白）", 2);
-        RadioButton customWatermark = watermarkRadio("换成我自己的文字", 3);
-        RadioButton keepWatermark = watermarkRadio("不动它", 4);
-        watermarkGroup.addView(removeWatermark);
-        watermarkGroup.addView(keepSpace);
-        watermarkGroup.addView(customWatermark);
-        watermarkGroup.addView(keepWatermark);
-        root.addView(watermarkGroup);
-
-        watermarkText = new EditText(this);
-        watermarkText.setHint("自定义文字，例如自己的昵称");
-        watermarkText.setSingleLine(true);
-        root.addView(watermarkText);
-
-        exportButton = new Button(this);
-        exportButton.setText("开始导出");
-        exportButton.setOnClickListener(view -> startExport());
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        buttonParams.topMargin = dp(16);
-        root.addView(exportButton, buttonParams);
-
-        statusView = new TextView(this);
-        statusView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        statusView.setPadding(0, dp(16), 0, 0);
-        statusView.setTextIsSelectable(true);
-        root.addView(statusView);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(root);
-
-        // Listeners are attached only once the whole layout exists: setting a
-        // radio button's checked state fires its listener immediately, and a
-        // listener that touches a view built later would crash on start-up.
-        word.setChecked(true);
-        formatGroup.setOnCheckedChangeListener((group, checked) -> refreshLayoutVisibility());
-        watermarkGroup.setOnCheckedChangeListener((group, checked) -> refreshLayoutVisibility());
-        return scroll;
+                @Override
+                public void afterTextChanged(Editable text) {
+                    saveOptions();
+                }
+            });
+        }
+        if (exportButton != null) {
+            exportButton.setOnClickListener(view -> startExport());
+        }
+        View tryOne = findViewById(R.id.action_try_one);
+        if (tryOne != null) {
+            tryOne.setOnClickListener(view -> exportOne());
+        }
+        View openFolder = findViewById(R.id.action_open_folder);
+        if (openFolder != null) {
+            openFolder.setOnClickListener(view -> openExportFolder());
+        }
+        View reset = findViewById(R.id.action_reset);
+        if (reset != null) {
+            reset.setOnClickListener(view -> resetOptions());
+        }
     }
 
-    private TextView title(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
-        view.setPadding(0, 0, 0, dp(8));
-        return view;
+    private void setStatus(String message, boolean error) {
+        statusView.setTextColor(getColor(error ? R.color.error_text : R.color.ok_text));
+        statusView.setText(message);
     }
 
-    private TextView section(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
-        view.setPadding(0, dp(16), 0, dp(4));
-        return view;
+    // -------------------------------------------------------------- the preview
+
+    /**
+     * Shows the small picture an export came back with.
+     *
+     * <p>The picture travels in the answer's {@code thumb} column, because this
+     * process can neither read the export folder nor draw a long note itself.
+     * It is also kept in the cache, so it survives the screen being rebuilt —
+     * which happens on every theme change, the very thing the preview exists to
+     * help judge.
+     */
+    private void showPreview(byte[] png) {
+        if (previewView == null || png == null || png.length == 0) {
+            return;
+        }
+        try {
+            Bitmap picture = BitmapFactory.decodeByteArray(png, 0, png.length);
+            if (picture == null) {
+                return;
+            }
+            Drawable previous = previewView.getDrawable();
+            previewView.setImageBitmap(picture);
+            previewView.setVisibility(View.VISIBLE);
+            if (previous instanceof BitmapDrawable) {
+                Bitmap older = ((BitmapDrawable) previous).getBitmap();
+                if (older != null && !older.isRecycled()) {
+                    older.recycle();
+                }
+            }
+            FileOutputStream out = new FileOutputStream(previewFile());
+            try {
+                out.write(png);
+            } finally {
+                out.close();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not show the preview: " + t);
+        }
     }
 
-    private TextView hint(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-        view.setTextColor(Color.GRAY);
-        return view;
+    /** Puts the last export's preview back when the screen is rebuilt. */
+    private void restorePreview() {
+        if (previewView == null) {
+            return;
+        }
+        File file = previewFile();
+        if (!file.isFile() || file.length() == 0) {
+            return;
+        }
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(file);
+            byte[] png = new byte[(int) file.length()];
+            int read = 0;
+            while (read < png.length) {
+                int step = in.read(png, read, png.length - read);
+                if (step < 0) {
+                    break;
+                }
+                read += step;
+            }
+            Bitmap picture = BitmapFactory.decodeByteArray(png, 0, read);
+            if (picture != null) {
+                previewView.setImageBitmap(picture);
+                previewView.setVisibility(View.VISIBLE);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not restore the preview: " + t);
+        } finally {
+            if (in != null) {
+                try {
+                    in.close();
+                } catch (Throwable ignored) {
+                    // nothing useful to do
+                }
+            }
+        }
     }
 
-    private RadioButton radio(String text, int id) {
-        RadioButton button = new RadioButton(this);
-        button.setText(text);
-        button.setId(id);
-        return button;
+    private File previewFile() {
+        return new File(getCacheDir(), "last-export.png");
     }
 
-    private RadioButton watermarkRadio(String text, int id) {
-        return radio(text, id);
-    }
-
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    /** The custom watermark's text field only matters in that one mode. */
+    private void refreshWatermarkField() {
+        if (watermarkText == null || watermarkGroup == null) {
+            return;
+        }
+        watermarkText.setEnabled(
+                watermarkGroup.getCheckedRadioButtonId() == R.id.watermark_custom);
     }
 
     private void refreshLayoutVisibility() {
@@ -260,66 +303,184 @@ public class ConfigActivity extends Activity {
             // listener fires while it is still being built.
             return;
         }
-        boolean word = formatGroup.getCheckedRadioButtonId() == 1;
-        layoutOptions.setVisibility(word ? View.VISIBLE : View.GONE);
-        if (watermarkText != null) {
-            watermarkText.setEnabled(watermarkModeOf(watermarkGroup) != null
-                    && ConfigContract.WATERMARK_CUSTOM.equals(watermarkModeOf(watermarkGroup)));
+        layoutOptions.setVisibility(
+                formatOf() == ExportOptions.Format.WORD ? View.VISIBLE : View.GONE);
+        refreshWatermarkField();
+    }
+
+    /**
+     * Opens the folder the exports land in, the way a file manager would.
+     *
+     * <p>The pictures are not in Downloads itself but in {@code 便签导出} below it,
+     * which is a level a file manager would not open on its own — so the folder
+     * itself is handed over as the document to view, with the Downloads root as
+     * the fallback for a phone whose export has not created it yet.
+     */
+    private void openExportFolder() {
+        String folder = "Download/" + ExportRequest.DIR;
+        Uri target = Uri.parse(DOWNLOAD_DOCUMENT + "%2F" + Uri.encode(ExportRequest.DIR));
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(target, DIRECTORY_MIME);
+        // Kept as well for the file managers that only read the picker's extra.
+        intent.putExtra(DocumentsContract.EXTRA_INITIAL_URI, target);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            // Left alone the system builds a "open with" chooser here, because
+            // both DocumentsUI and the phone's own file manager claim the uri.
+            // Picking one of them outright is what the button promised.
+            String viewer = fileManagerFor(intent);
+            if (viewer != null) {
+                intent.setPackage(viewer);
+            }
+            startActivity(intent);
+            setStatus(getString(R.string.status_folder_opened, folder), false);
+        } catch (Throwable t) {
+            Log.w(TAG, "no app would open " + folder + ": " + t);
+            openDownloadRoot(folder);
         }
     }
 
+    /** The whole Downloads folder, for when the export folder cannot be opened. */
+    private void openDownloadRoot(String folder) {
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(Uri.parse(DOWNLOAD_ROOT), ROOT_MIME);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            String viewer = fileManagerFor(intent);
+            if (viewer != null) {
+                intent.setPackage(viewer);
+            }
+            startActivity(intent);
+            setStatus(getString(R.string.status_folder_opened, "Download"), false);
+        } catch (Throwable t) {
+            // A device without a file manager still gets told where the files are.
+            Log.w(TAG, "no app would open Download either: " + t);
+            setStatus(getString(R.string.status_no_file_manager, folder), true);
+        }
+    }
+
+    /** The first app that can really show a folder, skipping the chooser itself. */
+    private String fileManagerFor(Intent intent) {
+        String fallback = null;
+        try {
+            for (ResolveInfo info : getPackageManager().queryIntentActivities(intent, 0)) {
+                if (info.activityInfo == null) {
+                    continue;
+                }
+                String packageName = info.activityInfo.packageName;
+                if ("android".equals(packageName)) {
+                    continue;
+                }
+                if ("com.android.documentsui".equals(packageName)) {
+                    return packageName;
+                }
+                if (fallback == null) {
+                    fallback = packageName;
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "could not list folder viewers: " + t);
+        }
+        return fallback;
+    }
+
+    // -------------------------------------------------------------- the options
+
+    /** The format the radio group currently selects. */
+    private ExportOptions.Format formatOf() {
+        int id = formatGroup == null ? View.NO_ID : formatGroup.getCheckedRadioButtonId();
+        if (id == R.id.format_native) {
+            // The app draws these itself, one note at a time, driven from inside
+            // its own process; the older share-screen route is kept for reference
+            // only and is not offered here any more.
+            return ExportOptions.Format.NATIVE_BATCH;
+        }
+        if (id == R.id.format_drawn) {
+            return ExportOptions.Format.IMAGE;
+        }
+        return ExportOptions.Format.WORD;
+    }
+
+    private ExportOptions.WordLayout layoutOf() {
+        int id = layoutGroup == null ? View.NO_ID : layoutGroup.getCheckedRadioButtonId();
+        return id == R.id.layout_per_note
+                ? ExportOptions.WordLayout.PER_NOTE : ExportOptions.WordLayout.SINGLE;
+    }
+
+    /**
+     * What a long picture is drawn on.
+     *
+     * <p>Always {@link ExportOptions.Background#AUTO}: the pictures are drawn by
+     * the Notes app in the colours of the phone's theme, and the module matches
+     * them rather than repainting. The Notes process works the same thing out
+     * from the page itself, so a theme switched between reading the screen and
+     * drawing a note still comes out right.
+     */
+    private ExportOptions.Background backgroundOf() {
+        return ExportOptions.Background.AUTO;
+    }
+
+    /** Says which background the phone's theme leads to. */
+    private void refreshBackgroundValue() {
+        if (backgroundValue == null) {
+            return;
+        }
+        boolean night = (getResources().getConfiguration().uiMode
+                & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        backgroundValue.setText(getString(night
+                ? R.string.background_follow_dark : R.string.background_follow_light));
+    }
+
     /** The mode the watermark radio group currently selects. */
-    private static String watermarkModeOf(RadioGroup group) {
-        if (group == null) {
-            return ConfigContract.WATERMARK_REMOVE;
+    private String watermarkModeOf() {
+        int id = watermarkGroup == null ? View.NO_ID : watermarkGroup.getCheckedRadioButtonId();
+        if (id == R.id.watermark_space) {
+            return ConfigContract.WATERMARK_KEEP_SPACE;
         }
-        switch (group.getCheckedRadioButtonId()) {
-            case 2:
-                return ConfigContract.WATERMARK_KEEP_SPACE;
-            case 3:
-                return ConfigContract.WATERMARK_CUSTOM;
-            case 4:
-                return ConfigContract.WATERMARK_OFF;
-            default:
-                return ConfigContract.WATERMARK_REMOVE;
+        if (id == R.id.watermark_custom) {
+            return ConfigContract.WATERMARK_CUSTOM;
         }
+        if (id == R.id.watermark_keep) {
+            return ConfigContract.WATERMARK_OFF;
+        }
+        return ConfigContract.WATERMARK_REMOVE;
     }
 
     /** The radio button id matching a stored mode. */
     private static int watermarkRadioId(String mode) {
         if (ConfigContract.WATERMARK_KEEP_SPACE.equals(mode)) {
-            return 2;
+            return R.id.watermark_space;
         }
         if (ConfigContract.WATERMARK_CUSTOM.equals(mode)) {
-            return 3;
+            return R.id.watermark_custom;
         }
         if (ConfigContract.WATERMARK_OFF.equals(mode)) {
-            return 4;
+            return R.id.watermark_keep;
         }
-        return 1;
+        return R.id.watermark_remove;
     }
 
-    // -------------------------------------------------------------- the export
+    private static String storedFormat(ExportOptions.Format format) {
+        switch (format) {
+            case IMAGE:
+                return ConfigContract.FORMAT_IMAGE;
+            case NATIVE:
+                return ConfigContract.FORMAT_NATIVE;
+            case NATIVE_BATCH:
+                return ConfigContract.FORMAT_NATIVE_BATCH;
+            default:
+                return ConfigContract.FORMAT_WORD;
+        }
+    }
 
+    /** Everything the form says, in the shape the export reads it in. */
     private ExportOptions readOptions() {
         ExportOptions options = new ExportOptions();
-        switch (formatGroup.getCheckedRadioButtonId()) {
-            case 2:
-                // The app draws these itself, one note at a time, driven from
-                // inside its own process; the older share-screen route is kept
-                // for reference only and is not offered here any more.
-                options.format = ExportOptions.Format.NATIVE_BATCH;
-                break;
-            case 3:
-                options.format = ExportOptions.Format.IMAGE;
-                break;
-            default:
-                options.format = ExportOptions.Format.WORD;
-                break;
-        }
-        options.wordLayout = layoutGroup.getCheckedRadioButtonId() == 2
-                ? ExportOptions.WordLayout.PER_NOTE : ExportOptions.WordLayout.SINGLE;
-        options.includeRecycled = recycledBox.isChecked();
+        options.format = formatOf();
+        options.wordLayout = layoutOf();
+        options.background = backgroundOf();
+        options.includeRecycled = recycledBox != null && recycledBox.isChecked();
         options.timestampedFolder = stampedBox == null || stampedBox.isChecked();
         options.numberedNames = numberedBox == null || numberedBox.isChecked();
         options.categoryFolders = foldersBox == null || foldersBox.isChecked();
@@ -334,19 +495,134 @@ public class ConfigActivity extends Activity {
                 // an empty or malformed count simply means "all of them"
             }
         }
-        switch (backgroundGroup.getCheckedRadioButtonId()) {
-            case 2:
-                options.background = ExportOptions.Background.WHITE;
-                break;
-            case 3:
-                options.background = ExportOptions.Background.DARK;
-                break;
-            default:
-                options.background = ExportOptions.Background.AUTO;
-                break;
-        }
         return options;
     }
+
+    // -------------------------------------------------------------- persistence
+
+    private void restoreOptions() {
+        SharedPreferences prefs = getSharedPreferences(ConfigContract.PREFS, MODE_PRIVATE);
+        restoring = true;
+        try {
+            String format = prefs.getString(ConfigContract.COLUMN_FORMAT,
+                    ConfigContract.FORMAT_NATIVE_BATCH);
+            String layout = prefs.getString(ConfigContract.COLUMN_WORD_LAYOUT,
+                    ConfigContract.LAYOUT_SINGLE);
+
+            check(formatGroup, formatRadioId(format));
+            check(layoutGroup, ConfigContract.LAYOUT_PER_NOTE.equals(layout)
+                    ? R.id.layout_per_note : R.id.layout_single);
+            check(recycledBox, prefs.getBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, true));
+            check(numberedBox, prefs.getBoolean(ConfigContract.COLUMN_NUMBERED, true));
+            check(foldersBox, prefs.getBoolean(ConfigContract.COLUMN_FOLDERS, true));
+            check(stampedBox, prefs.getBoolean(ConfigContract.COLUMN_STAMPED, true));
+            check(skipBox, prefs.getBoolean(ConfigContract.COLUMN_SKIP, false));
+            check(debugBox, prefs.getBoolean(ConfigContract.COLUMN_DEBUG, false));
+            if (limitBox != null) {
+                limitBox.setText(prefs.getString(ConfigContract.COLUMN_LIMIT, ""));
+            }
+            check(watermarkGroup, watermarkRadioId(WatermarkSettings.read(this).mode));
+            if (watermarkText != null) {
+                watermarkText.setText(WatermarkSettings.read(this).text);
+            }
+        } finally {
+            restoring = false;
+        }
+        refreshWatermarkField();
+        refreshBackgroundValue();
+    }
+
+    private static int formatRadioId(String format) {
+        if (ConfigContract.FORMAT_NATIVE.equals(format)
+                || ConfigContract.FORMAT_NATIVE_BATCH.equals(format)) {
+            return R.id.format_native;
+        }
+        if (ConfigContract.FORMAT_IMAGE.equals(format)) {
+            return R.id.format_drawn;
+        }
+        return R.id.format_word;
+    }
+
+    /**
+     * Writes the form's current state to the stored options.
+     *
+     * <p>Called from every control's listener, so a choice survives whatever
+     * happens to the task afterwards, and again from {@link #onPause()}.
+     */
+    private void saveOptions() {
+        if (restoring || formatGroup == null) {
+            return;
+        }
+        ExportOptions options = readOptions();
+        getSharedPreferences(ConfigContract.PREFS, MODE_PRIVATE)
+                .edit()
+                .putString(ConfigContract.COLUMN_FORMAT, storedFormat(options.format))
+                .putString(ConfigContract.COLUMN_WORD_LAYOUT,
+                        options.wordLayout == ExportOptions.WordLayout.PER_NOTE
+                                ? ConfigContract.LAYOUT_PER_NOTE : ConfigContract.LAYOUT_SINGLE)
+                .putBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, options.includeRecycled)
+                .putBoolean(ConfigContract.COLUMN_NUMBERED, options.numberedNames)
+                .putBoolean(ConfigContract.COLUMN_FOLDERS, options.categoryFolders)
+                .putBoolean(ConfigContract.COLUMN_STAMPED, options.timestampedFolder)
+                .putBoolean(ConfigContract.COLUMN_SKIP, options.skipExisting)
+                .putBoolean(ConfigContract.COLUMN_DEBUG, options.debug)
+                .putString(ConfigContract.COLUMN_LIMIT,
+                        limitBox == null ? "" : limitBox.getText().toString().trim())
+                .apply();
+        // The watermark travels to the Notes process through the provider and a
+        // mirrored file, so both are written here, where the user just decided.
+        WatermarkSettings.save(this, watermarkModeOf(),
+                watermarkText == null ? "" : watermarkText.getText().toString().trim());
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveOptions();
+    }
+
+    /** Puts every option back to what this module recommends, and saves it. */
+    private void resetOptions() {
+        restoring = true;
+        try {
+            check(formatGroup, R.id.format_native);      // 原版长图
+            check(layoutGroup, R.id.layout_single);
+            check(watermarkGroup, R.id.watermark_remove);  // 去掉水印
+            check(recycledBox, true);
+            check(numberedBox, true);
+            check(foldersBox, true);
+            check(stampedBox, true);
+            check(skipBox, false);
+            check(debugBox, false);
+            if (limitBox != null) {
+                limitBox.setText("");
+            }
+            if (watermarkText != null) {
+                watermarkText.setText("");
+            }
+            limitBeforeTrial = null;
+        } finally {
+            restoring = false;
+        }
+        refreshLayoutVisibility();
+        refreshWatermarkField();
+        saveOptions();
+        setStatus(getString(R.string.status_reset), false);
+    }
+
+    private void check(RadioGroup group, int option) {
+        if (group != null) {
+            group.check(option);
+        }
+    }
+
+    private void check(CheckBox box, boolean value) {
+        if (box != null) {
+            box.setChecked(value);
+        }
+    }
+
+    // -------------------------------------------------------------- the export
 
     /**
      * Exports a single note so the settings can be judged before a full run.
@@ -364,6 +640,7 @@ public class ConfigActivity extends Activity {
             limitBeforeTrial = limitBox.getText().toString();
         }
         limitBox.setText("1");
+        setStatus(getString(R.string.status_try_one), false);
         startExport();
     }
 
@@ -389,7 +666,7 @@ public class ConfigActivity extends Activity {
         // silently fell back to the defaults.
         ExportRequest.write(options);
 
-        setStatus("正在通知便签导出…（若便签未运行，首次启动可能需要几秒）", false);
+        setStatus(getString(R.string.status_asking), false);
         exportButton.setEnabled(false);
         attemptsLeft = 2;
 
@@ -398,7 +675,7 @@ public class ConfigActivity extends Activity {
             // The app draws these pictures itself, and Android only lets a
             // foreground app open its own screens — so the Notes app is brought
             // up first and asked a moment later.
-            setStatus("正在打开便签应用…（原版长图需要便签自己来画）", false);
+            setStatus(getString(R.string.status_opening_notes), false);
             openNotesApp();
             handler.postDelayed(() -> queryNotes(options), 3000);
             return;
@@ -418,6 +695,7 @@ public class ConfigActivity extends Activity {
         new Thread(() -> {
             String message = null;
             boolean ok = false;
+            byte[] thumbnail = null;
             for (String authority : authorities) {
                 Uri uri = ConfigContract.exportUri(authority);
                 Cursor cursor = null;
@@ -432,9 +710,14 @@ public class ConfigActivity extends Activity {
                         int okColumn = cursor.getColumnIndex("ok");
                         int messageColumn = cursor.getColumnIndex("message");
                         int pathColumn = cursor.getColumnIndex("path");
+                        int thumbColumn = cursor.getColumnIndex("thumb");
                         ok = okColumn >= 0 && cursor.getInt(okColumn) != 0;
                         message = messageColumn >= 0 ? cursor.getString(messageColumn) : null;
                         String path = pathColumn >= 0 ? cursor.getString(pathColumn) : null;
+                        // A blob column answers with null rather than throwing, and
+                        // a provider that does not have one simply has no column.
+                        thumbnail = thumbColumn >= 0 && !cursor.isNull(thumbColumn)
+                                ? cursor.getBlob(thumbColumn) : null;
                         if (ok && !TextUtils.isEmpty(path)) {
                             message = (message == null ? "导出完成" : message)
                                     + "\n位置：" + path;
@@ -453,12 +736,13 @@ public class ConfigActivity extends Activity {
                     }
                 }
             }
-            publish(message, ok);
+            publish(message, ok, thumbnail);
         }, "note-export-trigger").start();
     }
 
-    private void publish(final String message, final boolean ok) {
+    private void publish(final String message, final boolean ok, final byte[] thumbnail) {
         handler.post(() -> {
+            showPreview(thumbnail);
             if (message != null) {
                 boolean trial = limitBeforeTrial != null;
                 endTrial();
@@ -472,16 +756,13 @@ public class ConfigActivity extends Activity {
             if (attemptsLeft > 0) {
                 // Most likely the Notes app was cold and the module had not
                 // injected yet; opening it and asking again usually works.
-                setStatus("便签未响应，正在启动便签应用后重试…", false);
+                setStatus(getString(R.string.status_retrying), false);
                 openNotesApp();
                 handler.postDelayed(() -> queryNotes(readOptions()), 3000);
                 return;
             }
             endTrial();
-            setStatus("便签未响应。请确认：\n"
-                    + "1) 模块已在 LSPosed 中启用，作用域包含「便签」；\n"
-                    + "2) 至少冷启动过一次便签应用；\n"
-                    + "3) 在 LSPosed 日志中搜索 " + TAG.trim() + " 查看注入情况。", true);
+            setStatus(getString(R.string.status_no_response, TAG.trim()), true);
             running.set(false);
             exportButton.setEnabled(true);
         });
@@ -497,249 +778,6 @@ public class ConfigActivity extends Activity {
             }
         } catch (Throwable t) {
             Log.w(TAG, "could not open the Notes app: " + t);
-        }
-    }
-
-    private void setStatus(String message, boolean error) {
-        statusView.setTextColor(error ? 0xFFB00020 : 0xFF00695C);
-        statusView.setText(message);
-    }
-
-    // -------------------------------------------------------------- persistence
-
-    private void restoreOptions() {
-        Context context = this;
-        android.content.SharedPreferences prefs = context.getSharedPreferences(
-                ConfigContract.PREFS, MODE_PRIVATE);
-        String format = prefs.getString(ConfigContract.COLUMN_FORMAT,
-                ConfigContract.FORMAT_WORD);
-        String layout = prefs.getString(ConfigContract.COLUMN_WORD_LAYOUT,
-                ConfigContract.LAYOUT_SINGLE);
-        int formatId = 1;
-        if (ConfigContract.FORMAT_NATIVE.equals(format)
-                || ConfigContract.FORMAT_NATIVE_BATCH.equals(format)) {
-            formatId = 2;
-        } else if (ConfigContract.FORMAT_IMAGE.equals(format)) {
-            formatId = 3;
-        }
-        formatGroup.check(formatId);
-        layoutGroup.check(ConfigContract.LAYOUT_PER_NOTE.equals(layout) ? 2 : 1);
-        recycledBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, true));
-        String background = prefs.getString(ConfigContract.COLUMN_BACKGROUND,
-                ConfigContract.BACKGROUND_DARK);
-        int backgroundId = 3;
-        if (ConfigContract.BACKGROUND_WHITE.equals(background)) {
-            backgroundId = 2;
-        } else if (ConfigContract.BACKGROUND_AUTO.equals(background)) {
-            backgroundId = 1;
-        }
-        backgroundGroup.check(backgroundId);
-
-        String limit = prefs.getString(ConfigContract.COLUMN_LIMIT, "");
-        if (limitBox != null) {
-            limitBox.setText(limit);
-        }
-        if (numberedBox != null) {
-            numberedBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_NUMBERED, true));
-        }
-        if (foldersBox != null) {
-            foldersBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_FOLDERS, true));
-        }
-        if (stampedBox != null) {
-            stampedBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_STAMPED, true));
-        }
-        if (skipBox != null) {
-            skipBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_SKIP, false));
-        }
-        if (debugBox != null) {
-            debugBox.setChecked(prefs.getBoolean(ConfigContract.COLUMN_DEBUG, false));
-        }
-
-        WatermarkSettings watermark = WatermarkSettings.read(this);
-        watermarkGroup.check(watermarkRadioId(watermark.mode));
-        watermarkText.setText(watermark.text);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        ExportOptions options = readOptions();
-        getSharedPreferences(ConfigContract.PREFS, MODE_PRIVATE)
-                .edit()
-                .putString(ConfigContract.COLUMN_FORMAT,
-                        readOptions().format == ExportOptions.Format.IMAGE
-                                ? ConfigContract.FORMAT_IMAGE
-                                : readOptions().format == ExportOptions.Format.NATIVE
-                                        ? ConfigContract.FORMAT_NATIVE
-                                        : readOptions().format == ExportOptions.Format.NATIVE_BATCH
-                                                ? ConfigContract.FORMAT_NATIVE_BATCH
-                                                : ConfigContract.FORMAT_WORD)
-                .putString(ConfigContract.COLUMN_WORD_LAYOUT,
-                        options.wordLayout == ExportOptions.WordLayout.PER_NOTE
-                                ? ConfigContract.LAYOUT_PER_NOTE : ConfigContract.LAYOUT_SINGLE)
-                .putBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, options.includeRecycled)
-                .putString(ConfigContract.COLUMN_BACKGROUND,
-                        options.background == ExportOptions.Background.WHITE
-                                ? ConfigContract.BACKGROUND_WHITE
-                                : options.background == ExportOptions.Background.DARK
-                                        ? ConfigContract.BACKGROUND_DARK
-                                        : ConfigContract.BACKGROUND_AUTO)
-                .putString(ConfigContract.COLUMN_LIMIT,
-                        limitBox == null ? "" : limitBox.getText().toString().trim())
-                .putBoolean(ConfigContract.COLUMN_NUMBERED, options.numberedNames)
-                .putBoolean(ConfigContract.COLUMN_FOLDERS, options.categoryFolders)
-                .putBoolean(ConfigContract.COLUMN_STAMPED, options.timestampedFolder)
-                .putBoolean(ConfigContract.COLUMN_SKIP, options.skipExisting)
-                .putBoolean(ConfigContract.COLUMN_DEBUG, options.debug)
-                .apply();
-        // The watermark travels to the Notes process through the provider and a
-        // mirrored file, so both are written here, where the user just decided.
-        WatermarkSettings.save(this, watermarkModeOf(watermarkGroup),
-                watermarkText == null ? "" : watermarkText.getText().toString().trim());
-    }
-
-    /**
-     * Looks the screen's controls up and wires them together.
-     *
-     * <p>Everything is found first and only then are the listeners attached: a
-     * radio button's listener fires the moment its checked state is set, and a
-     * listener that touched a view that did not exist yet is exactly how this
-     * screen used to crash on start-up.
-     */
-    private void bindViews() {
-        formatGroup = findViewById(R.id.format_group);
-        layoutGroup = findViewById(R.id.layout_group);
-        layoutOptions = findViewById(R.id.word_options);
-        recycledBox = findViewById(R.id.option_recycled);
-        limitBox = findViewById(R.id.option_limit);
-        numberedBox = findViewById(R.id.option_numbered);
-        foldersBox = findViewById(R.id.option_folders);
-        stampedBox = findViewById(R.id.option_stamped);
-        skipBox = findViewById(R.id.option_skip);
-        debugBox = findViewById(R.id.option_debug);
-        backgroundGroup = findViewById(R.id.background_group);
-        watermarkGroup = findViewById(R.id.watermark_group);
-        watermarkText = findViewById(R.id.watermark_text);
-        exportButton = findViewById(R.id.action_export);
-        statusView = findViewById(R.id.status);
-
-        // The ids below are the values the screen reads back and stores, so they
-        // are kept as they were rather than replaced with the layout's own ids.
-        option(R.id.format_word, 1);
-        option(R.id.format_native, 2);
-        option(R.id.format_drawn, 3);
-        option(R.id.layout_single, 1);
-        option(R.id.layout_per_note, 2);
-        option(R.id.background_auto, 1);
-        option(R.id.background_white, 2);
-        option(R.id.background_dark, 3);
-        option(R.id.watermark_remove, 1);
-        option(R.id.watermark_space, 2);
-        option(R.id.watermark_custom, 3);
-        option(R.id.watermark_keep, 4);
-
-        if (formatGroup != null) {
-            formatGroup.setOnCheckedChangeListener((group, checked) -> refreshLayoutVisibility());
-        }
-        if (watermarkGroup != null) {
-            watermarkGroup.setOnCheckedChangeListener((group, checked) -> refreshWatermarkField());
-        }
-        if (exportButton != null) {
-            exportButton.setOnClickListener(view -> startExport());
-        }
-        View tryOne = findViewById(R.id.action_try_one);
-        if (tryOne != null) {
-            tryOne.setOnClickListener(view -> exportOne());
-        }
-        View openFolder = findViewById(R.id.action_open_folder);
-        if (openFolder != null) {
-            openFolder.setOnClickListener(view -> openExportFolder());
-        }
-        View reset = findViewById(R.id.action_reset);
-        if (reset != null) {
-            reset.setOnClickListener(view -> resetOptions());
-        }
-    }
-
-    /** Re-ids a radio button to the value the reading code expects. */
-    private void option(int viewId, int value) {
-        View view = findViewById(viewId);
-        if (view != null) {
-            view.setId(value);
-        }
-    }
-
-    /** The custom watermark's text field only matters in that one mode. */
-    private void refreshWatermarkField() {
-        if (watermarkText == null || watermarkGroup == null) {
-            return;
-        }
-        watermarkText.setEnabled(watermarkGroup.getCheckedRadioButtonId() == 3);
-    }
-
-    /** Opens the folder the exports land in, the way a file manager would. */
-    private void openExportFolder() {
-        try {
-            android.content.Intent intent = new android.content.Intent(
-                    android.content.Intent.ACTION_VIEW);
-            intent.setData(android.net.Uri.parse(
-                    "content://com.android.externalstorage.documents/document/primary%3ADownload"));
-            intent.setType("resource/folder");
-            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(intent);
-        } catch (Throwable t) {
-            // A device without a file manager still gets told where the files are.
-            setStatus(getString(R.string.status_no_file_manager), false);
-        }
-    }
-
-    /** Puts every option back to what this module recommends, and saves it. */
-    private void resetOptions() {
-        check(formatGroup, 2);            // 原版长图
-        check(layoutGroup, 1);
-        check(backgroundGroup, 3);        // 一律黑底白字
-        check(watermarkGroup, 1);         // 去掉水印
-        set(recycledBox, true);
-        set(numberedBox, true);
-        set(foldersBox, true);
-        set(stampedBox, true);
-        set(skipBox, false);
-        set(debugBox, false);
-        if (limitBox != null) {
-            limitBox.setText("");
-        }
-        limitBeforeTrial = null;
-        if (watermarkText != null) {
-            watermarkText.setText("");
-        }
-        refreshLayoutVisibility();
-        refreshWatermarkField();
-        getSharedPreferences(ConfigContract.PREFS, MODE_PRIVATE).edit()
-                .putString(ConfigContract.COLUMN_FORMAT, ConfigContract.FORMAT_NATIVE_BATCH)
-                .putString(ConfigContract.COLUMN_WORD_LAYOUT, ConfigContract.LAYOUT_SINGLE)
-                .putString(ConfigContract.COLUMN_BACKGROUND, ConfigContract.BACKGROUND_DARK)
-                .putString(ConfigContract.COLUMN_WATERMARK_MODE, ConfigContract.WATERMARK_REMOVE)
-                .putString(ConfigContract.COLUMN_WATERMARK_TEXT, "")
-                .putBoolean(ConfigContract.COLUMN_INCLUDE_RECYCLED, true)
-                .putBoolean(ConfigContract.COLUMN_NUMBERED, true)
-                .putBoolean(ConfigContract.COLUMN_FOLDERS, true)
-                .putBoolean(ConfigContract.COLUMN_STAMPED, true)
-                .putBoolean(ConfigContract.COLUMN_SKIP, false)
-                .putBoolean(ConfigContract.COLUMN_DEBUG, false)
-                .putString(ConfigContract.COLUMN_LIMIT, "")
-                .apply();
-        setStatus("已恢复默认设置。", true);
-    }
-
-    private void check(RadioGroup group, int option) {
-        if (group != null) {
-            group.check(option);
-        }
-    }
-
-    private void set(CheckBox box, boolean value) {
-        if (box != null) {
-            box.setChecked(value);
         }
     }
 }

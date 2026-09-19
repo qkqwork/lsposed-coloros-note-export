@@ -63,8 +63,14 @@ public final class ConfigContract {
      */
     public static final String DIAG_SEGMENT = "note_dsh_diag";
 
-    /** Columns of the {@link android.database.MatrixCursor} returned by a query. */
-    public static final String[] EXPORT_COLUMNS = {"ok", "message", "path"};
+    /**
+     * Columns of the {@link android.database.MatrixCursor} returned by a query.
+     *
+     * <p>{@code thumb} is a small PNG of the first exported note, or null. It
+     * rides along because the settings screen has no access to the export folder
+     * and no storage permission of its own.
+     */
+    public static final String[] EXPORT_COLUMNS = {"ok", "message", "path", "thumb"};
 
     public static Uri exportUri(String authority) {
         return Uri.parse("content://" + authority + "/" + EXPORT_SEGMENT);

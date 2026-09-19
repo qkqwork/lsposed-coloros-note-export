@@ -223,7 +223,7 @@ public class Main implements IXposedHookLoadPackage {
 
     private static MatrixCursor probeCursor() {
         MatrixCursor cursor = new MatrixCursor(ConfigContract.EXPORT_COLUMNS);
-        cursor.addRow(new Object[] {1, "模块已注入便签进程", ""});
+        cursor.addRow(new Object[] {1, "模块已注入便签进程", "", null});
         return cursor;
     }
 
@@ -291,7 +291,7 @@ public class Main implements IXposedHookLoadPackage {
                     // the next time the Notes app starts.
                     ExportRequest.markHandled(context, request.id);
                 }
-                return answer(result.ok, result.message, result.path);
+                return answer(result.ok, result.message, result.path, result.thumbnail);
             } catch (Throwable t) {
                 Log.e(TAG, "export threw", t);
                 return answer(false, "导出失败：" + t, "");
@@ -302,10 +302,16 @@ public class Main implements IXposedHookLoadPackage {
     }
 
     private static MatrixCursor answer(boolean ok, String message, String path) {
+        return answer(ok, message, path, null);
+    }
+
+    private static MatrixCursor answer(boolean ok, String message, String path,
+            byte[] thumbnail) {
         MatrixCursor cursor = new MatrixCursor(ConfigContract.EXPORT_COLUMNS);
-        cursor.addRow(new Object[] {ok ? 1 : 0, message, path});
+        cursor.addRow(new Object[] {ok ? 1 : 0, message, path, thumbnail});
         Log.i(TAG, "export answer: ok=" + ok + " " + message
-                + (path == null || path.isEmpty() ? "" : " -> " + path));
+                + (path == null || path.isEmpty() ? "" : " -> " + path)
+                + (thumbnail == null ? "" : " (+" + thumbnail.length + " byte preview)"));
         return cursor;
     }
 

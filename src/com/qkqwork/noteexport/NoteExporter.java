@@ -1,6 +1,7 @@
 package com.qkqwork.noteexport;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -47,11 +48,24 @@ public final class NoteExporter {
         public final boolean ok;
         public final String message;
         public final String path;
+        /**
+         * A small PNG of the top of the first exported note, or null.
+         *
+         * <p>Travels back to the settings screen inside the same cursor as the
+         * message, which is how that screen can show what an export looks like
+         * without any access to the export folder.
+         */
+        public final byte[] thumbnail;
 
         public Result(boolean ok, String message, String path) {
+            this(ok, message, path, null);
+        }
+
+        public Result(boolean ok, String message, String path, byte[] thumbnail) {
             this.ok = ok;
             this.message = message;
             this.path = path;
+            this.thumbnail = thumbnail;
         }
     }
 
@@ -88,6 +102,11 @@ public final class NoteExporter {
         stats.deleted = snapshot.deleted;
         stats.exported = snapshot.notes.size();
 
+        // Filled in by whichever format draws a picture; the Word formats have
+        // nothing worth showing, since their pages are text the screen cannot
+        // reproduce faithfully in a preview.
+        byte[] thumbnail = null;
+
         if (options.format == ExportOptions.Format.WORD) {
             exportWord(context, options, snapshot, root, stats);
         } else if (options.format == ExportOptions.Format.NATIVE) {
@@ -101,7 +120,7 @@ public final class NoteExporter {
             writeReadme(context, root, options, stats);
             return result;
         } else {
-            exportImages(context, options, snapshot, root, stats);
+            thumbnail = exportImages(context, options, snapshot, root, stats);
         }
 
         writeReadme(context, root, options, stats);
@@ -110,7 +129,7 @@ public final class NoteExporter {
             summary += "（跳过 " + stats.encrypted + " 条加密便签）";
         }
         Log.i(TAG, summary);
-        return new Result(true, summary, root);
+        return new Result(true, summary, root, thumbnail);
     }
 
     // ------------------------------------------------------------------- word
@@ -241,8 +260,14 @@ public final class NoteExporter {
 
     // ----------------------------------------------------------------- images
 
-    private static void exportImages(Context context, ExportOptions options,
+    /**
+     * Draws one PNG per note, and keeps the first one as a preview.
+     *
+     * @return a small preview of the first note's picture, or null
+     */
+    private static byte[] exportImages(Context context, ExportOptions options,
             NoteStore.Snapshot snapshot, String root, Stats stats) {
+        byte[] preview = null;
         for (Map.Entry<String, List<Note>> group
                 : groupsToExport(snapshot, options).entrySet()) {
             String category = group.getKey();
@@ -257,11 +282,16 @@ public final class NoteExporter {
                     // The note's body goes in as it is; the renderer wraps and
                     // lays it out itself, with no browser engine involved.
                     sink = ExportSink.open(context, dir, name, "image/png");
-                    if (LongImageRenderer.renderTo(context, note.body(),
-                            NoteStore.attachmentDir(context, note), sink.stream())) {
+                    Bitmap drawn = LongImageRenderer.renderTo(context, note.body(),
+                            NoteStore.attachmentDir(context, note), sink.stream());
+                    if (drawn != null) {
                         sink.finish();
                         stats.files++;
                         stats.notes++;
+                        if (preview == null) {
+                            preview = Thumbnail.of(drawn);
+                        }
+                        drawn.recycle();
                     } else {
                         sink.abort();
                         stats.failed++;
@@ -276,6 +306,7 @@ public final class NoteExporter {
                 copyAttachments(context, note, dir, base, stats);
             }
         }
+        return preview;
     }
 
     // ------------------------------------------------------------ note pieces

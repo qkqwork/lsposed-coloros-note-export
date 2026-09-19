@@ -21,6 +21,7 @@ D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\NoteStore.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\PipelineProbe.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ProgressNotifier.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\ShareProbe.java
+D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\Thumbnail.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\WatermarkHook.java
 D:\AndroidProjects\oppo-note-export\src\com\qkqwork\noteexport\WatermarkSettings.java
 D:\AndroidProjects\oppo-note-export\stubs\de\robv\android\xposed\IXposedHookLoadPackage.java

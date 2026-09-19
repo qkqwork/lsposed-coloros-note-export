@@ -77,6 +77,8 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\Capture
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\CaptureProbe$4.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\CaptureProbe$StepTracer.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\CaptureProbe.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ConfigActivity$1.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ConfigActivity$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ConfigActivity.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ConfigContract.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ConfigProvider.class
@@ -141,6 +143,7 @@ D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\SharePr
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe$2.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe$3.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\ShareProbe.class
+D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\Thumbnail.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\WatermarkHook$ApplyAfter.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\WatermarkHook$ApplyBefore.class
 D:\AndroidProjects\oppo-note-export\build\classes\com\qkqwork\noteexport\WatermarkHook$Hook.class

@@ -184,33 +184,19 @@
             android:layout_height="wrap_content"
             android:text="@string/background_note" />
 
-        <RadioGroup
-            android:id="@+id/background_group"
+        <TextView
+            android:id="@+id/background_value"
+            style="@style/NoteExport.Value"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:text="@string/background_follow_dark" />
 
-            <RadioButton
-                android:id="@+id/background_dark"
-                style="@style/NoteExport.Option"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/background_dark" />
-
-            <RadioButton
-                android:id="@+id/background_white"
-                style="@style/NoteExport.Option"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/background_white" />
-
-            <RadioButton
-                android:id="@+id/background_auto"
-                style="@style/NoteExport.Option"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/background_auto" />
-        </RadioGroup>
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:text="@string/background_change_note" />
 
 
         <TextView
@@ -311,6 +297,29 @@
                 android:layout_weight="1"
                 android:text="@string/action_reset" />
         </LinearLayout>
+
+        <TextView
+            style="@style/NoteExport.Section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/section_preview" />
+
+        <TextView
+            style="@style/NoteExport.Hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/preview_note" />
+
+        <ImageView
+            android:id="@+id/preview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="@dimen/item_spacing"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/content_description_thumbnail"
+            android:maxHeight="360dp"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/status"

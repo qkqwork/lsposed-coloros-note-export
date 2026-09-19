@@ -37,6 +37,17 @@
         <item name="android:paddingBottom">@dimen/item_spacing</item>
     </style>
 
+    <!-- A row that states a value instead of offering a choice: the long
+         picture's background follows the phone's theme, so there is nothing
+         here to tap. -->
+    <style name="NoteExport.Value">
+        <item name="android:textSize">@dimen/body_text</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/body_text</item>
+        <item name="android:background">@drawable/card_background</item>
+        <item name="android:padding">@dimen/card_padding</item>
+    </style>
+
     <style name="NoteExport.Status">
         <item name="android:textSize">@dimen/body_text</item>
         <item name="android:textColor">@color/body_text</item>

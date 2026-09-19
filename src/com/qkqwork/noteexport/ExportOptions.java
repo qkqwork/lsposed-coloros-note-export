@@ -38,11 +38,13 @@ public final class ExportOptions {
     /**
      * The backing of a long picture.
      *
-     * <p>Dark by default: the app draws these notes in its dark theme, so their
-     * text is white and a dark backing is what the app itself puts behind it.
-     * The settings screen offers the other two.
+     * <p>Automatic, and that is the only thing the settings screen asks for: the
+     * Notes app draws these pictures in the colours of the phone's theme, so the
+     * module reads the backing off the page it was handed instead of imposing
+     * one and repainting the glyphs to suit. A request that arrives with no
+     * colour of its own therefore means "the same as the note".
      */
-    public Background background = Background.DARK;
+    public Background background = Background.AUTO;
 
     /** Include notes sitting in the recycle bin. */
     public boolean includeRecycled = true;

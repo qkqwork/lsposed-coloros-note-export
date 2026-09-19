@@ -158,26 +158,32 @@ public final class LongImageRenderer {
         return bitmap;
     }
 
-    /** Renders and streams the result straight into {@code out} as a PNG. */
-    public static boolean renderTo(Context context, String html, File baseDir,
+    /**
+     * Renders and streams the result straight into {@code out} as a PNG.
+     *
+     * <p>Answers with the picture that was drawn — already compressed, but still
+     * usable as the source of a preview — or null if nothing was written. The
+     * caller owns it and should recycle it.
+     */
+    public static Bitmap renderTo(Context context, String html, File baseDir,
             OutputStream out) {
         Bitmap bitmap = render(context, html, baseDir);
         if (bitmap == null) {
-            return false;
+            return null;
         }
         try {
             if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)) {
                 Log.w(TAG, "render: png compression reported failure");
-                return false;
+                bitmap.recycle();
+                return null;
             }
             Log.i(TAG, "render: wrote " + bitmap.getWidth() + "x" + bitmap.getHeight()
                     + " picture");
-            return true;
+            return bitmap;
         } catch (Throwable t) {
             Log.e(TAG, "render: writing the picture failed", t);
-            return false;
-        } finally {
             bitmap.recycle();
+            return null;
         }
     }
 
@@ -191,7 +197,12 @@ public final class LongImageRenderer {
         FileOutputStream out = null;
         try {
             out = new FileOutputStream(target);
-            return renderTo(context, html, baseDir, out);
+            Bitmap rendered = renderTo(context, html, baseDir, out);
+            if (rendered == null) {
+                return false;
+            }
+            rendered.recycle();
+            return true;
         } catch (Throwable t) {
             Log.e(TAG, "renderToFile failed", t);
             return false;

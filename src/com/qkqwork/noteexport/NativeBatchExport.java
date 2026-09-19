@@ -549,6 +549,7 @@ final class NativeBatchExport {
 
         ProgressNotifier.start(context, limit);
         int failuresInARow = 0;
+        byte[] preview = null;
         for (int i = 0; i < limit; i++) {
             Note note = notes.get(i);
             Log.i(TAG, "native batch: " + (i + 1) + "/" + limit + " " + note.id);
@@ -604,6 +605,11 @@ final class NativeBatchExport {
             failuresInARow = 0;
             if (save(context, note, i + 1, root, picture, stats, options)) {
                 stats.notes++;
+                if (preview == null) {
+                    // Kept so the settings screen can show what came out without
+                    // being able to read the export folder.
+                    preview = Thumbnail.of(picture);
+                }
             } else {
                 stats.failed++;
             }
@@ -621,7 +627,7 @@ final class NativeBatchExport {
         // do, so it counts as a success with nothing to report but the skips.
         boolean ok = stats.notes > 0 || stats.skipped > 0;
         ProgressNotifier.finish(context, message + "\n位置：" + root, ok);
-        return new NoteExporter.Result(ok, message, root);
+        return new NoteExporter.Result(ok, message, root, preview);
     }
 
     /** Where a note's picture goes: the folder and the file name. */

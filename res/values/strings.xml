@@ -26,10 +26,10 @@
     <string name="option_debug_note">调试日志会挂上十几个探针并把便签内部的方法清单打进 logcat，只在排查问题时勾选。</string>
 
     <string name="section_background">长图底色</string>
-    <string name="background_note">便签应用把长图的纸面交出来时是不带底色的，字画在透明底上。「黑底白字」是应用自己导出时的样子（默认）；「白底」会把白字重画成黑字；「自动」按便签的字色选，若你把系统切成浅色主题、字变黑了，自动就会给白底。注意：白底或黑底与照片里的大片同色区域无法区分，那一块会融进底色。</string>
-    <string name="background_dark">一律黑底白字（默认）</string>
-    <string name="background_white">一律白底（白字自动转黑）</string>
-    <string name="background_auto">自动（跟着便签的字色，浅色主题下自动白底）</string>
+    <string name="background_note">底色跟着系统主题走，这里没有单独的开关。便签自己也是按系统主题画长图的：深色主题下它交出的是透明纸 + 白字，底色由模块补上；浅色主题下它直接把白纸黑字画进图里。模块跟着同一套配色，导出的图就和你现在在便签里看到的一致，不必改动任何一个像素。</string>
+    <string name="background_follow_dark">当前系统主题：深色 → 黑底白字（与便签显示一致）</string>
+    <string name="background_follow_light">当前系统主题：浅色 → 白底黑字（与便签显示一致）</string>
+    <string name="background_change_note">想换底色就改系统主题（设置 → 显示与亮度 → 深色模式）。这里不能单独切换：强行反色只能靠模块逐像素重绘字色，抗锯齿的字边、照片里的大片同色区域和超过 40 像素的连续平直笔画会留下残影。</string>
 
     <string name="section_watermark">分享长图的水印</string>
     <string name="watermark_note">便签自己「分享为图片」时，长图底部会带 ColorOS 水印。这里决定怎么处理它 —— 这一项在便签应用里生效，导出产物不涉及水印。</string>
@@ -46,7 +46,16 @@
     <string name="status_try_one">先试 1 条：只看第 1 条便签的效果，条数不会被记住。</string>
     <string name="status_try_one_done">这是「先试 1 条」的结果；满意后点「开始导出」导出全部。</string>
     <string name="status_idle">准备就绪：选好格式后点「开始导出」。</string>
-    <string name="status_no_file_manager">找不到能打开文件夹的应用，导出目录在：Download/便签导出</string>
+    <string name="status_reset">已恢复默认设置。</string>
+    <string name="status_asking">正在通知便签导出…（若便签未运行，首次启动可能需要几秒）</string>
+    <string name="status_opening_notes">正在打开便签应用…（原版长图需要便签自己来画）</string>
+    <string name="status_retrying">便签未响应，正在启动便签应用后重试…</string>
+    <string name="status_no_response">便签未响应。请确认：\n1) 模块已在 LSPosed 中启用，作用域包含「便签」；\n2) 至少冷启动过一次便签应用；\n3) 在 LSPosed 日志中搜索 %1$s 查看注入情况。</string>
+    <string name="status_folder_opened">导出目录：%1$s（已交给文件管理器打开）</string>
+    <string name="status_no_file_manager">找不到能打开文件夹的应用，导出目录在：%1$s</string>
+
+    <string name="section_preview">最近一次导出</string>
+    <string name="preview_note">导出或「先试 1 条」之后，这里会显示第一张图的顶部，用来核对底色、字色和版式。整张长图太长，只留顶部一截。</string>
 
     <string name="content_description_thumbnail">最近一次导出的缩略图</string>
 </resources>

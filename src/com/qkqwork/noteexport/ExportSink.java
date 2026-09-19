@@ -99,9 +99,7 @@ public final class ExportSink {
     public static ExportSink open(Context context, String relativeDir, String name,
             String mimeType) throws Exception {
         ExportSink sink = new ExportSink(context);
-        String relativePath = relativeDir == null || relativeDir.length() == 0
-                ? Environment.DIRECTORY_DOWNLOADS
-                : Environment.DIRECTORY_DOWNLOADS + "/" + relativeDir;
+        String relativePath = relativeDirectory(relativeDir);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ContentValues values = new ContentValues();
@@ -135,16 +133,39 @@ public final class ExportSink {
     }
 
     /**
-     * Whether that destination already holds a file of this name.
+     * Opens a destination that is meant to be rewritten rather than added to.
      *
-     * <p>Used to resume an export that was interrupted: asked before opening a
-     * destination, so a note that is already exported is left alone instead of
-     * being drawn and written again.
+     * <p>MediaStore renames a new row when the name it is handed is taken, which
+     * is how the settings mirror ended up beside the pictures as
+     * {@code note_watermark (1).txt}, {@code (2)} and so on, one per export.
+     * Writing over the row that is already there keeps the folder to one file.
      */
-    public static boolean exists(Context context, String relativeDir, String name) {
-        String relativePath = relativeDir == null || relativeDir.length() == 0
-                ? Environment.DIRECTORY_DOWNLOADS + "/"
-                : Environment.DIRECTORY_DOWNLOADS + "/" + relativeDir + "/";
+    public static ExportSink replace(Context context, String relativeDir, String name,
+            String mimeType) throws Exception {
+        Uri existing = find(context, relativeDir, name);
+        if (existing != null) {
+            ExportSink sink = new ExportSink(context);
+            OutputStream out = sink.resolver.openOutputStream(existing, "wt");
+            if (out != null) {
+                sink.uri = existing;
+                sink.stream = out;
+                sink.displayPath = join(relativeDirectory(relativeDir), name);
+                return sink;
+            }
+            Log.w(TAG, "could not rewrite " + existing + ", adding a new file instead");
+        }
+        return open(context, relativeDir, name, mimeType);
+    }
+
+    /** The relative path (below Downloads) a directory argument stands for. */
+    private static String relativeDirectory(String relativeDir) {
+        return relativeDir == null || relativeDir.length() == 0
+                ? Environment.DIRECTORY_DOWNLOADS
+                : Environment.DIRECTORY_DOWNLOADS + "/" + relativeDir;
+    }
+
+    /** The MediaStore row already holding that name, or null. */
+    private static Uri find(Context context, String relativeDir, String name) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 String[] projection = {MediaStore.Downloads._ID};
@@ -152,10 +173,14 @@ public final class ExportSink {
                         + MediaStore.Downloads.RELATIVE_PATH + "=?";
                 Cursor cursor = context.getContentResolver().query(
                         MediaStore.Downloads.EXTERNAL_CONTENT_URI, projection, where,
-                        new String[] {name, relativePath}, null);
+                        new String[] {name, relativeDirectory(relativeDir) + "/"}, null);
                 if (cursor != null) {
                     try {
-                        return cursor.moveToFirst();
+                        if (cursor.moveToFirst()) {
+                            return android.content.ContentUris.withAppendedId(
+                                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                                    cursor.getLong(0));
+                        }
                     } finally {
                         cursor.close();
                     }
@@ -163,6 +188,20 @@ public final class ExportSink {
             }
         } catch (Throwable t) {
             Log.w(TAG, "could not ask MediaStore about " + name + ": " + t);
+        }
+        return null;
+    }
+
+    /**
+     * Whether that destination already holds a file of this name.
+     *
+     * <p>Used to resume an export that was interrupted: asked before opening a
+     * destination, so a note that is already exported is left alone instead of
+     * being drawn and written again.
+     */
+    public static boolean exists(Context context, String relativeDir, String name) {
+        if (find(context, relativeDir, name) != null) {
+            return true;
         }
         File dir = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOWNLOADS), relativeDir == null ? "" : relativeDir);
