@@ -102,7 +102,7 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 | 字段 | 填什么 |
 | --- | --- |
 | 模块名称 | `ColorOS Note Export` |
-| 模块包名 | `com.qkqwork.noteexport` |
+| 模块包名 | `io.github.qkqwork.noteexport` |
 | 源码仓库 | `https://github.com/qkqwork/lsposed-coloros-note-export` |
 | 模块描述 | 上面「一段话」那一版 |
 | 作用域 | `com.coloros.note`（便签） |
@@ -114,7 +114,7 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 
 | 要求 | 本项目当前状态 |
 | --- | --- |
-| 包名唯一、像域名倒写 | ✅ `com.qkqwork.noteexport` |
+| 包名唯一、像域名倒写 | ✅ `io.github.qkqwork.noteexport` |
 | 源码开源、可公开访问 | ✅ GPL-3.0，仓库公开 |
 | APK 里带 Xposed 元数据 | ✅ `xposedmodule` / `xposedminversion=93` / `xposeddescription` / `xposedscope=com.coloros.note` |
 | **有 release 且 APK 作为附件** | ⬜ 发布 `v1.0` 之后满足 |
@@ -129,14 +129,14 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 
 1. 打开官方提交页 <https://modules.lsposed.org/submission/>。
    它会用 **GitHub 账号登录**（授权后以你的名义建 issue），所以用**仓库所属的那个账号**登录。
-2. 表单基本只要两样：**模块包名** `com.qkqwork.noteexport` 与
+2. 表单基本只要两样：**模块包名** `io.github.qkqwork.noteexport` 与
    **源码仓库** `https://github.com/qkqwork/lsposed-coloros-note-export`；
    有的版本还会要模块名、描述、是否已有 release——描述直接用本文上面那三档里的「一段话」。
 3. 提交后会在 [`Xposed-Modules-Repo/submission`](https://github.com/Xposed-Modules-Repo/submission)
    里生成一个 issue，等维护者人工过。可能会被问作用域/权限/验证环境，本项目的现成答案：
    **不申请任何权限、只读便签自己的数据库、零第三方依赖（不含 AndroidX/Material）、
    在 PKR110 / Android 16 / 便签 16.6.22 上逐项真机验证过**。
-4. 通过后官方会建 `Xposed-Modules-Repo/com.qkqwork.noteexport`，机器人把最新 release 同步进去
+4. 通过后官方会建 `Xposed-Modules-Repo/io.github.qkqwork.noteexport`，机器人把最新 release 同步进去
    （APK + 从清单读到的名称/描述/版本），模块就会出现在 LSPosed 管理器的模块仓库里。
 
 **表单打不开 / 提交失败时的备用做法**：直接在
@@ -145,7 +145,7 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 
 ```
 模块名称：ColorOS Note Export
-模块包名：com.qkqwork.noteexport
+模块包名：io.github.qkqwork.noteexport
 源码仓库：https://github.com/qkqwork/lsposed-coloros-note-export
 License：GPL-3.0（开源）
 作用域：com.coloros.note（便签）

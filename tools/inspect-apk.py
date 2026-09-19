@@ -38,9 +38,9 @@ with zipfile.ZipFile(apk) as zf:
         dex = zf.read('classes.dex')
         print('classes.dex magic:', dex[:4].decode('latin-1'),
               'size:', len(dex))
-        for needle in [b'com/qkqwork/noteexport/Main',
-                       b'com/qkqwork/noteexport/HtmlToWord',
-                       b'com/qkqwork/noteexport/DocxWriter',
-                       b'com/qkqwork/noteexport/LongImageRenderer']:
+        for needle in [b'io/github/qkqwork/noteexport/Main',
+                       b'io/github/qkqwork/noteexport/HtmlToWord',
+                       b'io/github/qkqwork/noteexport/DocxWriter',
+                       b'io/github/qkqwork/noteexport/LongImageRenderer']:
             print('  [%s] %s' % ('ok' if needle in dex else 'FAIL',
                                  needle.decode('latin-1')))

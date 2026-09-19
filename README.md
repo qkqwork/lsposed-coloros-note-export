@@ -8,7 +8,7 @@
 | 仓库 | <https://github.com/qkqwork/lsposed-coloros-note-export> |
 | 作者 | **qkqwork**（设备、需求与真机验证）· 代码由 **DeepSeek Harness** 编写 |
 | 许可 | GPL-3.0 |
-| 包名 | `com.qkqwork.noteexport`（LSPosed 里的名称：**ColorOS Note Export**） |
+| 包名 | `io.github.qkqwork.noteexport`（LSPosed 里的名称：**ColorOS Note Export**） |
 | 作用域 | 只勾 `com.coloros.note`（便签） |
 | 已验证设备 | ColorOS 16（Android 16 / API 36）· 便签 **16.6.22** |
 | 依赖 | 无——不引入 AndroidX / Material，dex 里只有本项目自己的类 |
@@ -129,7 +129,7 @@ content://com.oneplus.provider.Note/<自定义路径段>
 ## 目录
 
 ```
-src/com/qkqwork/noteexport/
+src/io/github/qkqwork/noteexport/
   Main.java                  Xposed 入口：provider 拦截（导出 / 探针 / 诊断 / 便签清单）+ 兜底链路
   Hooks.java                 反射式 findAndHookMethod（绕开 legacy API 的签名坑）
   ConfigActivity.java        设置页（XML 布局 + 资源，选项即改即存、进度条、预览）
