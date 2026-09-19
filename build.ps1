@@ -1,4 +1,4 @@
-# Builds the module APK without Gradle and without the Android SDK manager.
+﻿# Builds the module APK without Gradle and without the Android SDK manager.
 #
 # Only two things are needed: a JDK 17 and an Android SDK containing
 # platforms/android-<n>/android.jar plus build-tools (aapt2, d8, apksigner,
@@ -213,7 +213,11 @@ Write-Info $btDir
 
 Write-Step '4/7 compiling java'
 $classes = Join-Path $out 'classes'
-if ($Rebuild -and (Test-Path $classes)) { Remove-Item $classes -Recurse -Force }
+# Emptied every time, not only under -Rebuild: javac overwrites the classes it
+# compiles but leaves behind the ones whose source was deleted, and those stale
+# classes are then dexed into the APK. A class removed from the source must not
+# survive in the artefact that ships.
+if (Test-Path $classes) { Remove-Item $classes -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $classes | Out-Null
 
 $sources = @()
