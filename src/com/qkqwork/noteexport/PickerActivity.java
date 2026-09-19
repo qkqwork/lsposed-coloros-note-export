@@ -77,6 +77,10 @@ public class PickerActivity extends Activity {
         new Thread(() -> {
             List<Row> found = new ArrayList<>();
             String failure = null;
+            // Whether any authority answered with the module's own columns. A
+            // provider that does not know this path answers null, and that is not
+            // "there are no notes" — it is "the module is not there".
+            boolean answered = false;
             for (String authority : ConfigContract.NOTES_AUTHORITIES) {
                 Uri uri = ConfigContract.listUri(authority);
                 Cursor cursor = null;
@@ -86,6 +90,19 @@ public class PickerActivity extends Activity {
                     if (cursor == null) {
                         continue;
                     }
+                    if (!hasModuleColumns(cursor)) {
+                        // The real provider answered instead of the module's
+                        // injected one: it hands back whole notes under its own
+                        // column names, and one of the authorities answers this
+                        // path with an empty cursor of its own shape. Listing
+                        // either would be a screenful of rows with no titles, so
+                        // both count as no answer.
+                        failure = "not the module's list";
+                        Log.w(TAG, authority + " answered without the module's columns; "
+                                + "is the module enabled for the Notes app?");
+                        continue;
+                    }
+                    answered = true;
                     while (cursor.moveToNext()) {
                         found.add(Row.of(cursor));
                     }
@@ -105,18 +122,16 @@ public class PickerActivity extends Activity {
                 }
             }
             final List<Row> result = found;
-            final String error = failure;
+            final String error = answered ? failure
+                    : (failure == null ? "nothing answered" : failure);
             handler.post(() -> fill(result, error));
         }, "note-list").start();
     }
 
     private void fill(List<Row> notes, String error) {
-        if (rows.isEmpty() && notes.isEmpty()) {
-            if (error != null) {
-                setStatus(getString(R.string.picker_failed), true);
-            } else {
-                setStatus(getString(R.string.picker_empty), error != null);
-            }
+        if (notes.isEmpty()) {
+            setStatus(getString(error != null ? R.string.picker_failed : R.string.picker_empty),
+                    error != null);
             return;
         }
         for (Row note : notes) {
@@ -133,6 +148,23 @@ public class PickerActivity extends Activity {
             ids.add(note.id);
         }
         refreshSummary();
+    }
+
+    /**
+     * Whether that answer really came from the module.
+     *
+     * <p>The check is on the whole column set the module promises, not on one
+     * name: the Notes app's own backup provider answers the same path with a
+     * completely different cursor, and another authority answers it with an empty
+     * one, so a single column is not enough to tell them apart.
+     */
+    private static boolean hasModuleColumns(Cursor cursor) {
+        for (String column : ConfigContract.LIST_COLUMNS) {
+            if (cursor.getColumnIndex(column) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void setAll(boolean checked) {
