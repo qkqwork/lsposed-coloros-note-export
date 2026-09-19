@@ -110,11 +110,34 @@ LSPosed 的模块列表（`modules.lsposed.org`）由官方组织
 | 是否开源 | 是 |
 | 已测试环境 | ColorOS 16（Android 16 / API 36）· 便签 16.6.22 |
 
+### 包名（Application ID）必须能证明是你的
+
+提交页对此有硬要求：application id 要用**你确实拥有的反向域名**，并在该域名根上挂一条 TXT 记录
+
+```
+lsposed-modules-repo-verification=<你的 GitHub 用户名>
+```
+
+**没有域名的话**，官方给的兜底是 `io.github.<你的 GitHub 用户名>` 前缀——用 GitHub 账号即可，
+不需要任何 DNS。**随机域名不行**，所以本项目用的是：
+
+```
+io.github.qkqwork.noteexport
+```
+
+（它原先是 `com.qkqwork.noteexport`，而 `qkqwork` 是 GitHub 账号不是域名，因此改名。
+改名流程由 `build/rename-package.py` 完成，它是参数化的，改包名时直接跑
+`python build/rename-package.py 旧包名 新包名`：它会搬源码目录，并改写清单、provider authority、
+`assets/xposed_init`、两个进程共用的常量，以及文档与脚本里的引用。）
+
+⚠️ **换包名等于换应用身份**：已安装的用户要卸载重装、在 LSPosed 里**重新启用并勾作用域**、
+再冷启动便签应用；旧包的数据（设置项）不会跟过来。
+
 ### 提交前的自查
 
 | 要求 | 本项目当前状态 |
 | --- | --- |
-| 包名唯一、像域名倒写 | ✅ `io.github.qkqwork.noteexport` |
+| application id 可证明归属 | ✅ `io.github.qkqwork.noteexport`（走 `io.github.<用户名>` 兜底，无需 TXT 记录） |
 | 源码开源、可公开访问 | ✅ GPL-3.0，仓库公开 |
 | APK 里带 Xposed 元数据 | ✅ `xposedmodule` / `xposedminversion=93` / `xposeddescription` / `xposedscope=com.coloros.note` |
 | **有 release 且 APK 作为附件** | ⬜ 发布 `v1.0` 之后满足 |
